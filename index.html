@@ -55,6 +55,7 @@
       box-shadow: 0 0 60px rgba(0,102,255,0.07), 0 2px 40px rgba(0,0,0,0.6);
     }
 
+    /* top accent bar */
     .card::before {
       content: '';
       position: absolute;
@@ -64,6 +65,7 @@
       border-radius: 4px 4px 0 0;
     }
 
+    /* corner marks */
     .card::after {
       content: '';
       position: absolute;
@@ -75,6 +77,7 @@
       opacity: 0.4;
     }
 
+    /* ── Header ── */
     .header {
       display: flex;
       align-items: flex-start;
@@ -113,6 +116,7 @@
       text-transform: uppercase;
     }
 
+    /* ── Field ── */
     .field { margin-bottom: 1.5rem; }
 
     label {
@@ -139,6 +143,7 @@
       align-items: center;
     }
 
+    /* ── Button ── */
     .btn {
       position: relative;
       display: inline-flex;
@@ -173,9 +178,12 @@
     .btn:hover { box-shadow: 0 0 18px rgba(0,102,255,0.3); color: #fff; }
     .btn:active { transform: scale(0.98); }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
     .btn span { position: relative; }
+
     .btn-icon { position: relative; width: 16px; height: 16px; }
 
+    /* spinner */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner {
       display: none;
@@ -188,6 +196,7 @@
     .btn.loading .btn-icon-default { display: none; }
     .btn.loading .spinner { display: block; }
 
+    /* ── Output ── */
     .output-label {
       font-size: 0.72rem;
       font-family: var(--mono);
@@ -207,9 +216,9 @@
       transition: background 0.3s;
       flex-shrink: 0;
     }
-    .status-dot.ok  { background: var(--success); box-shadow: 0 0 8px var(--success); }
-    .status-dot.err { background: var(--error);   box-shadow: 0 0 8px var(--error); }
-    .status-dot.busy{ background: var(--warn);    box-shadow: 0 0 8px var(--warn); animation: pulse 1s infinite; }
+    .status-dot.ok    { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    .status-dot.err   { background: var(--error);   box-shadow: 0 0 8px var(--error); }
+    .status-dot.busy  { background: var(--warn);    box-shadow: 0 0 8px var(--warn); animation: pulse 1s infinite; }
 
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
@@ -234,10 +243,12 @@
     .output-box .line-info { color: var(--accent); }
     .output-box .line-muted{ color: var(--muted); }
 
+    /* scrollbar */
     .output-box::-webkit-scrollbar { width: 4px; }
     .output-box::-webkit-scrollbar-track { background: transparent; }
     .output-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
+    /* ── Footer ── */
     .footer {
       margin-top: 1.5rem;
       padding-top: 1rem;
@@ -301,15 +312,18 @@
 </div>
 
 <script>
-  const SUPABASE_URL   = "https://ubookoijqdmrxdlxldxf.supabase.co";
+  // ─── CONFIG ────────────────────────────────────────────────────────────────
+  const SUPABASE_URL = "https://ubookoijqdmrxdlxldxf.supabase.co";
   const FUNCTIONS_BASE = `${SUPABASE_URL}/functions/v1`;
 
-  const params     = new URLSearchParams(window.location.search);
+  // ─── PARSE URL PARAMS ──────────────────────────────────────────────────────
+  const params  = new URLSearchParams(window.location.search);
   const SESSION_ID = params.get("sid") || "";
   const SIG        = params.get("sig") || "";
 
   document.getElementById("display-sid").textContent = SESSION_ID || "(none)";
 
+  // ─── OUTPUT HELPERS ────────────────────────────────────────────────────────
   const outputEl  = document.getElementById("output");
   const statusDot = document.getElementById("statusDot");
   const startBtn  = document.getElementById("startBtn");
@@ -323,96 +337,135 @@
     outputEl.scrollTop = outputEl.scrollHeight;
   }
 
-  function clearLog() { outputEl.innerHTML = ""; }
-  function setStatus(s) { statusDot.className = "status-dot " + s; }
-  function setBusy(b) { startBtn.disabled = b; startBtn.classList.toggle("loading", b); }
+  function clearLog() {
+    outputEl.innerHTML = "";
+  }
 
-  function base64urlToBuffer(b64) {
-    const base64 = b64.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=");
-    const bin    = atob(padded);
-    const buf    = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-    return buf.buffer;
+  function setStatus(state) {
+    statusDot.className = "status-dot " + state;
+  }
+
+  function setBusy(busy) {
+    startBtn.disabled = busy;
+    startBtn.classList.toggle("loading", busy);
+  }
+
+  // ─── BASE64URL HELPERS ─────────────────────────────────────────────────────
+  function base64urlToBuffer(base64url) {
+    const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+    const padded  = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=");
+    const binary  = atob(padded);
+    const buffer  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
+    return buffer.buffer;
   }
 
   function bufferToBase64url(buffer) {
-    const bytes = new Uint8Array(buffer);
-    let bin = "";
-    for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
-    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    const bytes  = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
   }
 
+  // ─── MAIN FLOW ─────────────────────────────────────────────────────────────
   async function startHandshake() {
     clearLog();
     setBusy(true);
     setStatus("busy");
 
     try {
-      if (!SESSION_ID) throw new Error("No session ID found in URL (?sid=…)");
+      // ── Validate session ──────────────────────────────────────────────────
+      if (!SESSION_ID) {
+        throw new Error("No session ID found in URL (?sid=…)");
+      }
 
+      // ── Step 1 · create-challenge ─────────────────────────────────────────
       log("→ Requesting challenge from Supabase…", "info");
+
       const challengeRes = await fetch(`${FUNCTIONS_BASE}/create-challenge`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ sessionId: SESSION_ID, sig: SIG }),
+        body:    JSON.stringify({ sid: SESSION_ID, sig: SIG }),
       });
 
       if (!challengeRes.ok) {
-        const t = await challengeRes.text().catch(() => challengeRes.statusText);
-        throw new Error(`create-challenge failed (${challengeRes.status}): ${t}`);
+        const errText = await challengeRes.text().catch(() => challengeRes.statusText);
+        throw new Error(`create-challenge failed (${challengeRes.status}): ${errText}`);
       }
 
-      const challengeData    = await challengeRes.json();
-      const rawChallenge     = challengeData.challenge;
-      const rpId             = challengeData.rpId || window.location.hostname;
+      const challengeData = await challengeRes.json();
+      log("← Challenge received.", "ok");
+
+      // Expected shape: { challenge: "<base64url>", rpId: "...", allowCredentials: [...] }
+      const rawChallenge    = challengeData.challenge;
+      const rpId            = challengeData.rpId    || window.location.hostname;
       const allowCredentials = challengeData.allowCredentials || [];
 
       if (!rawChallenge) throw new Error("Response missing 'challenge' field.");
-      log("← Challenge received.", "ok");
       log(`   challenge: ${rawChallenge.slice(0, 20)}…`, "muted");
       log(`   rpId:      ${rpId}`, "muted");
 
+      // ── Step 2 · navigator.credentials.get ───────────────────────────────
       log("→ Invoking passkey prompt…", "info");
-      const assertion = await navigator.credentials.get({
-        publicKey: {
-          challenge:        base64urlToBuffer(rawChallenge),
-          rpId,
-          allowCredentials: allowCredentials.map(c => ({ type: "public-key", id: base64urlToBuffer(c.id) })),
-          userVerification: "preferred",
-          timeout:          60000,
-        }
-      });
-      log("← Assertion obtained.", "ok");
 
-      const r = assertion.response;
+      const publicKeyOptions = {
+        challenge:        base64urlToBuffer(rawChallenge),
+        rpId:             rpId,
+        allowCredentials: allowCredentials.map(c => ({
+          type: "public-key",
+          id:   base64urlToBuffer(c.id),
+        })),
+        userVerification: "preferred",
+        timeout:          60000,
+      };
+
+      let assertion;
+      try {
+        assertion = await navigator.credentials.get({ publicKey: publicKeyOptions });
+      } catch (credErr) {
+        throw new Error(`Passkey prompt failed: ${credErr.message}`);
+      }
+
+      log("← Assertion obtained from authenticator.", "ok");
+
+      // ── Step 3 · Serialize assertion ──────────────────────────────────────
+      const response = assertion.response;
+      const assertionPayload = {
+        sid:  SESSION_ID,
+        sig:  SIG,
+        id:        assertion.id,
+        rawId:     bufferToBase64url(assertion.rawId),
+        type:      assertion.type,
+        response:  {
+          authenticatorData: bufferToBase64url(response.authenticatorData),
+          clientDataJSON:    bufferToBase64url(response.clientDataJSON),
+          signature:         bufferToBase64url(response.signature),
+          userHandle:        response.userHandle ? bufferToBase64url(response.userHandle) : null,
+        },
+      };
+
+      // ── Step 4 · verify-assertion ─────────────────────────────────────────
       log("→ Sending assertion for verification…", "info");
+
       const verifyRes = await fetch(`${FUNCTIONS_BASE}/verify-assertion`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          sessionId: SESSION_ID, sig: SIG,
-          id: assertion.id, rawId: bufferToBase64url(assertion.rawId), type: assertion.type,
-          response: {
-            authenticatorData: bufferToBase64url(r.authenticatorData),
-            clientDataJSON:    bufferToBase64url(r.clientDataJSON),
-            signature:         bufferToBase64url(r.signature),
-            userHandle:        r.userHandle ? bufferToBase64url(r.userHandle) : null,
-          },
-        }),
+        body:    JSON.stringify(assertionPayload),
       });
 
       if (!verifyRes.ok) {
-        const t = await verifyRes.text().catch(() => verifyRes.statusText);
-        throw new Error(`verify-assertion failed (${verifyRes.status}): ${t}`);
+        const errText = await verifyRes.text().catch(() => verifyRes.statusText);
+        throw new Error(`verify-assertion failed (${verifyRes.status}): ${errText}`);
       }
 
-      const result = await verifyRes.json();
+      const verifyData = await verifyRes.json();
       log("← Verification complete.", "ok");
-      log("✔  " + (result.message || JSON.stringify(result, null, 2)), "ok");
+      log("", "muted");
+      log("✔  " + (verifyData.message || JSON.stringify(verifyData, null, 2)), "ok");
       setStatus("ok");
 
     } catch (err) {
+      log("", "muted");
       log("✘  " + err.message, "err");
       setStatus("err");
     } finally {
