@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIRA Passkey Registration</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0e14;
+      --surface:   #111520;
+      --border:    #1e2535;
+      --accent:    #00e5ff;
+      --accent2:   #0066ff;
+      --text:      #c8d6e5;
+      --muted:     #4a5568;
+      --success:   #00c896;
+      --error:     #ff4466;
+      --warn:      #ffaa00;
+      --mono:      'IBM Plex Mono', monospace;
+      --sans:      'IBM Plex Sans', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,229,255,0.08) 0%, transparent 60%),
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(30,37,53,0.4) 39px, rgba(30,37,53,0.4) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(30,37,53,0.4) 39px, rgba(30,37,53,0.4) 40px);
+    }
+
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2.5rem 2.5rem 2rem;
+      position: relative;
+      box-shadow: 0 0 60px rgba(0,229,255,0.05), 0 2px 40px rgba(0,0,0,0.6);
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2), transparent);
+      border-radius: 4px 4px 0 0;
+    }
+
+    .card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 40px; height: 40px;
+      border-bottom: 1px solid var(--accent);
+      border-right: 1px solid var(--accent);
+      border-radius: 0 0 4px 0;
+      opacity: 0.4;
+    }
+
+    .header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .logo {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 0 20px rgba(0,229,255,0.25);
+    }
+
+    .logo svg { width: 20px; height: 20px; fill: #fff; }
+
+    h1 {
+      font-family: var(--mono);
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-family: var(--mono);
+      margin-top: 3px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .info-box {
+      background: rgba(0,229,255,0.04);
+      border: 1px solid rgba(0,229,255,0.15);
+      border-radius: 3px;
+      padding: 0.8rem 1rem;
+      font-size: 0.82rem;
+      color: var(--text);
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    .info-box strong {
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+
+    .btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.7rem 1.6rem;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+      overflow: hidden;
+      margin-bottom: 2rem;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover::before { opacity: 0.12; }
+    .btn:hover { box-shadow: 0 0 18px rgba(0,229,255,0.3); color: #fff; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn span { position: relative; }
+    .btn-icon { position: relative; width: 16px; height: 16px; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: none;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(0,229,255,0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    .btn.loading .btn-icon-default { display: none; }
+    .btn.loading .spinner { display: block; }
+
+    .output-label {
+      font-size: 0.72rem;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    .status-dot.ok   { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    .status-dot.err  { background: var(--error);   box-shadow: 0 0 8px var(--error); }
+    .status-dot.busy { background: var(--warn);    box-shadow: 0 0 8px var(--warn); animation: pulse 1s infinite; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .output-box {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1rem 1.1rem;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.7;
+      color: var(--text);
+      min-height: 80px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .output-box .line-ok    { color: var(--success); }
+    .output-box .line-err   { color: var(--error); }
+    .output-box .line-info  { color: var(--accent); }
+    .output-box .line-muted { color: var(--muted); }
+
+    .output-box::-webkit-scrollbar { width: 4px; }
+    .output-box::-webkit-scrollbar-track { background: transparent; }
+    .output-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .footer {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .badge {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 0.25rem 0.5rem;
+    }
+
+    .login-link {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-decoration: none;
+      letter-spacing: 0.06em;
+    }
+    .login-link:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+    </div>
+    <div>
+      <h1>SIRA · Register Passkey</h1>
+      <div class="subtitle">Create a new passkey for this device</div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    This will create a <strong>passkey</strong> tied to this device and browser.
+    Once registered, you can use it to authenticate via the SIRA handshake page.
+    Your device will prompt you for biometrics (Face ID, fingerprint, or PIN).
+  </div>
+
+  <button class="btn" id="registerBtn" onclick="startRegistration()">
+    <span class="btn-icon">
+      <svg class="btn-icon-default" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      <div class="spinner"></div>
+    </span>
+    <span>Create passkey</span>
+  </button>
+
+  <div class="output-label">
+    <div class="status-dot" id="statusDot"></div>
+    Output
+  </div>
+  <div class="output-box" id="output">Ready to register…</div>
+
+  <div class="footer">
+    <span class="badge">SIRA v1 · Registration</span>
+    <a class="login-link" href="/?sid=TEST&sig=TEST">← Back to handshake</a>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL      = "https://ubookoijqdmrxdlxldxf.supabase.co";
+  const FUNCTIONS_BASE    = `${SUPABASE_URL}/functions/v1`;
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVib29rb2lqcWRtcnhkbHhsZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4OTY2MzYsImV4cCI6MjA4NjQ3MjYzNn0.vCsN8B-kVYlzhsp3nfzYvzzEfLSLln7fCXolh8gE9fo";
+
+  const outputEl  = document.getElementById("output");
+  const statusDot = document.getElementById("statusDot");
+  const btn       = document.getElementById("registerBtn");
+
+  function log(msg, type = "info") {
+    const line = document.createElement("div");
+    line.className = `line-${type}`;
+    line.textContent = msg;
+    if (outputEl.textContent === "Ready to register…") outputEl.textContent = "";
+    outputEl.appendChild(line);
+    outputEl.scrollTop = outputEl.scrollHeight;
+  }
+
+  function clearLog() { outputEl.innerHTML = ""; }
+  function setStatus(s) { statusDot.className = "status-dot " + s; }
+  function setBusy(b) { btn.disabled = b; btn.classList.toggle("loading", b); }
+
+  function b64urlToBuffer(b64) {
+    const base64 = b64.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=");
+    const bin    = atob(padded);
+    const buf    = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return buf.buffer;
+  }
+
+  function bufferToBase64url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let bin = "";
+    for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  }
+
+  async function startRegistration() {
+    clearLog();
+    setBusy(true);
+    setStatus("busy");
+
+    try {
+      // ── Step 1: Get registration challenge ───────────────────────────────
+      log("→ Requesting registration challenge…", "info");
+
+      const challengeRes = await fetch(`${FUNCTIONS_BASE}/register-challenge`, {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!challengeRes.ok) {
+        const t = await challengeRes.text().catch(() => challengeRes.statusText);
+        throw new Error(`register-challenge failed (${challengeRes.status}): ${t}`);
+      }
+
+      const challengeData = await challengeRes.json();
+      const pk = challengeData.publicKey || challengeData;
+
+      if (!pk.challenge) throw new Error("Response missing 'challenge' field.");
+      log("← Challenge received.", "ok");
+
+      // ── Step 2: Create passkey on device ─────────────────────────────────
+      log("→ Invoking passkey creation prompt…", "info");
+
+      const publicKeyOptions = {
+        ...pk,
+        challenge: b64urlToBuffer(pk.challenge),
+        user: {
+          ...pk.user,
+          id: b64urlToBuffer(pk.user.id),
+        },
+        excludeCredentials: (pk.excludeCredentials || []).map(c => ({
+          ...c,
+          id: b64urlToBuffer(c.id),
+        })),
+      };
+
+      let credential;
+      try {
+        credential = await navigator.credentials.create({ publicKey: publicKeyOptions });
+      } catch (credErr) {
+        throw new Error(`Passkey creation failed: ${credErr.message}`);
+      }
+
+      log("← Passkey created on device.", "ok");
+
+      // ── Step 3: Send attestation to verify ───────────────────────────────
+      log("→ Verifying registration with Supabase…", "info");
+
+      const attestation = {
+        id:    credential.id,
+        rawId: bufferToBase64url(credential.rawId),
+        type:  credential.type,
+        response: {
+          clientDataJSON:    bufferToBase64url(credential.response.clientDataJSON),
+          attestationObject: bufferToBase64url(credential.response.attestationObject),
+        },
+      };
+
+      const verifyRes = await fetch(`${FUNCTIONS_BASE}/register-verify`, {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ attestation }),
+      });
+
+      if (!verifyRes.ok) {
+        const t = await verifyRes.text().catch(() => verifyRes.statusText);
+        throw new Error(`register-verify failed (${verifyRes.status}): ${t}`);
+      }
+
+      const result = await verifyRes.json();
+      log("← Registration verified!", "ok");
+      log("", "muted");
+      log("✔  " + (result.message || JSON.stringify(result, null, 2)), "ok");
+      log("", "muted");
+      log("You can now use the handshake page to authenticate.", "muted");
+      setStatus("ok");
+
+    } catch (err) {
+      log("", "muted");
+      log("✘  " + err.message, "err");
+      setStatus("err");
+    } finally {
+      setBusy(false);
+    }
+  }
+</script>
+</body>
+</html>
