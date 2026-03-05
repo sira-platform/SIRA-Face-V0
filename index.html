@@ -35,9 +35,8 @@
     const go = document.getElementById("go")
 
     sidBox.textContent = sid || "(missing sid)"
-
     if (!sid || !sig) {
-      out.textContent = "Open with ?sid=TEST&sig=TEST"
+      out.textContent = "Open with sid and sig in the URL"
     } else {
       go.disabled = false
     }
@@ -56,8 +55,35 @@
       return { ok: res.ok, status: res.status, data }
     }
 
+    function base64urlToU8(s) {
+      const b64 = s.replace(/-/g, "+").replace(/_/g, "/")
+      const pad = b64.length % 4 ? "=".repeat(4 - (b64.length % 4)) : ""
+      const raw = atob(b64 + pad)
+      const out = new Uint8Array(raw.length)
+      for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i)
+      return out
+    }
+
     function u8ToArr(buf) {
       return Array.from(new Uint8Array(buf))
+    }
+
+    function normalizePublicKeyOptions(pk) {
+      const copy = { ...pk }
+
+      if (typeof copy.challenge === "string") {
+        copy.challenge = base64urlToU8(copy.challenge)
+      }
+
+      if (Array.isArray(copy.allowCredentials)) {
+        copy.allowCredentials = copy.allowCredentials.map(c => {
+          const cc = { ...c }
+          if (typeof cc.id === "string") cc.id = base64urlToU8(cc.id)
+          return cc
+        })
+      }
+
+      return copy
     }
 
     async function start() {
@@ -75,9 +101,11 @@
           return
         }
 
-        const publicKey = ch.data.publicKey || ch.data
+        const serverObj = ch.data
+        const publicKeyRaw = serverObj.publicKey || serverObj
+        const publicKey = normalizePublicKeyOptions(publicKeyRaw)
 
-        out.textContent = "Requesting passkey..."
+        out.textContent = "Invoking passkey prompt..."
         const cred = await navigator.credentials.get({ publicKey })
 
         const assertion = {
