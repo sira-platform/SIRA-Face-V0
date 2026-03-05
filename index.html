@@ -35,18 +35,28 @@
     const go = document.getElementById("go")
 
     sidBox.textContent = sid || "(missing sid)"
+
     if (!sid || !sig) {
-      out.textContent = "Open with sid and sig in the URL"
+      out.textContent = "Open with ?sid=TEST&sig=TEST"
     } else {
       go.disabled = false
     }
 
+    // Your Supabase project
     const SUPABASE_BASE = "https://ubookoijqdmrxdlxldxf.supabase.co"
 
-    async function postJson(url, payload) {
+    // IMPORTANT: paste your Supabase ANON key here (Project Settings -> API -> anon public)
+    const SUPABASE_ANON_KEY = "PASTE_YOUR_ANON_KEY_HERE"
+
+    async function postJson(path, payload) {
+      const url = SUPABASE_BASE + path
       const res = await fetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+          "authorization": "Bearer " + SUPABASE_ANON_KEY
+        },
         body: JSON.stringify(payload)
       })
       const text = await res.text()
@@ -55,35 +65,8 @@
       return { ok: res.ok, status: res.status, data }
     }
 
-    function base64urlToU8(s) {
-      const b64 = s.replace(/-/g, "+").replace(/_/g, "/")
-      const pad = b64.length % 4 ? "=".repeat(4 - (b64.length % 4)) : ""
-      const raw = atob(b64 + pad)
-      const out = new Uint8Array(raw.length)
-      for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i)
-      return out
-    }
-
     function u8ToArr(buf) {
       return Array.from(new Uint8Array(buf))
-    }
-
-    function normalizePublicKeyOptions(pk) {
-      const copy = { ...pk }
-
-      if (typeof copy.challenge === "string") {
-        copy.challenge = base64urlToU8(copy.challenge)
-      }
-
-      if (Array.isArray(copy.allowCredentials)) {
-        copy.allowCredentials = copy.allowCredentials.map(c => {
-          const cc = { ...c }
-          if (typeof cc.id === "string") cc.id = base64urlToU8(cc.id)
-          return cc
-        })
-      }
-
-      return copy
     }
 
     async function start() {
@@ -92,20 +75,22 @@
           out.textContent = "Missing sid or sig"
           return
         }
-
-        out.textContent = "Calling create challenge..."
-        const ch = await postJson(SUPABASE_BASE + "/functions/v1/create-challenge", { sid, sig })
-
-        if (!ch.ok) {
-          out.textContent = "create challenge failed. Status " + ch.status + "\n" + JSON.stringify(ch.data, null, 2)
+        if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("PASTE_YOUR_ANON_KEY_HERE")) {
+          out.textContent = "Missing SUPABASE_ANON_KEY. Paste it in the HTML."
           return
         }
 
-        const serverObj = ch.data
-        const publicKeyRaw = serverObj.publicKey || serverObj
-        const publicKey = normalizePublicKeyOptions(publicKeyRaw)
+        out.textContent = "Calling create-challenge..."
+        const ch = await postJson("/functions/v1/create-challenge", { sid, sig })
 
-        out.textContent = "Invoking passkey prompt..."
+        if (!ch.ok) {
+          out.textContent = "create-challenge failed. Status " + ch.status + "\n" + JSON.stringify(ch.data, null, 2)
+          return
+        }
+
+        const publicKey = ch.data.publicKey || ch.data
+
+        out.textContent = "Requesting passkey..."
         const cred = await navigator.credentials.get({ publicKey })
 
         const assertion = {
@@ -120,10 +105,10 @@
           }
         }
 
-        out.textContent = "Calling confirm challenge..."
-        const vr = await postJson(SUPABASE_BASE + "/functions/v1/confirm-challenge", { sid, sig, assertion })
+        out.textContent = "Calling confirm-challenge..."
+        const vr = await postJson("/functions/v1/confirm-challenge", { sid, sig, assertion })
 
-        out.textContent = "confirm challenge. Status " + vr.status + "\n" + JSON.stringify(vr.data, null, 2)
+        out.textContent = "confirm-challenge. Status " + vr.status + "\n" + JSON.stringify(vr.data, null, 2)
       } catch (e) {
         out.textContent = "ERROR\n" + String(e && e.message ? e.message : e)
       }
