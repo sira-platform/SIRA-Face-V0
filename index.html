@@ -42,14 +42,21 @@
       go.disabled = false
     }
 
-    // Your Supabase project
+    // 1) Your Supabase project
     const SUPABASE_BASE = "https://ubookoijqdmrxdlxldxf.supabase.co"
 
-    // IMPORTANT: paste your Supabase ANON key here (Project Settings -> API -> anon public)
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVib29rb2lqcWRtcnhkbHhsZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4OTY2MzYsImV4cCI6MjA4NjQ3MjYzNn0.vCsN8B-kVYlzhsp3nfzYvzzEfLSLln7fCXolh8gE9fo"
+    // 2) Paste your anon key here (Supabase Dashboard -> Settings -> API)
+    const SUPABASE_ANON_KEY = "PASTE_YOUR_ANON_KEY_HERE"
 
-    async function postJson(path, payload) {
-      const url = SUPABASE_BASE + path
+    function assertAnonKey() {
+      if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("PASTE_YOUR")) {
+        out.textContent = "Missing SUPABASE_ANON_KEY. Paste it in the HTML."
+        return false
+      }
+      return true
+    }
+
+    async function postJson(url, payload) {
       const res = await fetch(url, {
         method: "POST",
         headers: {
@@ -75,13 +82,10 @@
           out.textContent = "Missing sid or sig"
           return
         }
-        if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("PASTE_YOUR_ANON_KEY_HERE")) {
-          out.textContent = "Missing SUPABASE_ANON_KEY. Paste it in the HTML."
-          return
-        }
+        if (!assertAnonKey()) return
 
         out.textContent = "Calling create-challenge..."
-        const ch = await postJson("/functions/v1/create-challenge", { sid, sig })
+        const ch = await postJson(SUPABASE_BASE + "/functions/v1/create-challenge", { sid, sig })
 
         if (!ch.ok) {
           out.textContent = "create-challenge failed. Status " + ch.status + "\n" + JSON.stringify(ch.data, null, 2)
@@ -106,7 +110,7 @@
         }
 
         out.textContent = "Calling confirm-challenge..."
-        const vr = await postJson("/functions/v1/confirm-challenge", { sid, sig, assertion })
+        const vr = await postJson(SUPABASE_BASE + "/functions/v1/confirm-challenge", { sid, sig, assertion })
 
         out.textContent = "confirm-challenge. Status " + vr.status + "\n" + JSON.stringify(vr.data, null, 2)
       } catch (e) {
