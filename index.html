@@ -1,77 +1,98 @@
-Deno.serve((req: Request) => {
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>SIRA Handshake</title>
-<style>
-body { font-family: system-ui; margin:40px }
-button { padding:12px 20px; font-size:18px; cursor:pointer }
-pre { background:#eee; padding:10px; white-space:pre-wrap }
-</style>
-</head>
-<body>
-<h2>SIRA Secure Handshake</h2>
-<p>Session ID:</p>
-<pre id="sid">loading</pre>
-<p><button id="go" type="button">Start passkey handshake</button></p>
-<pre id="out"></pre>
-<script>
-const params = new URLSearchParams(window.location.search)
-document.getElementById("sid").textContent = params.get("sid") || "(missing sid)"
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SIRA Secure Handshake</title>
+    <style>
+      body { font-family: system-ui, Arial, sans-serif; margin: 32px; }
+      .card { max-width: 720px; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
+      button { padding: 10px 14px; font-size: 16px; cursor: pointer; }
+      pre { background: #f6f6f6; padding: 12px; border-radius: 8px; overflow: auto; }
+      .muted { color: #666; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>SIRA Secure Handshake</h1>
 
-async function startPasskey(){
-  const sid = params.get("sid")
-  const sig = params.get("sig")
-  const base = window.location.origin
+      <p class="muted">Session ID</p>
+      <pre id="sidBox">(missing sid)</pre>
 
-  const r = await fetch(base + "/functions/v1/create-challenge?sid=" + encodeURIComponent(sid) + "&sig=" + encodeURIComponent(sig))
-  const j = await r.json()
+      <button id="go" disabled>Start passkey handshake</button>
 
-  const challenge = Uint8Array.from(
-    atob(j.challenge.replace(/-/g,"+").replace(/_/g,"/")),
-    c => c.charCodeAt(0)
-  )
+      <h3>Output</h3>
+      <pre id="out">(no action yet)</pre>
+    </div>
 
-  const publicKey = {
-    challenge,
-    timeout: j.timeoutMs,
-    rpId: j.rpId,
-    userVerification: j.userVerification
-  }
+    <script>
+      const params = new URLSearchParams(window.location.search)
+      const sid = params.get("sid")
+      const sig = params.get("sig")
 
-  const cred = await navigator.credentials.get({ publicKey })
+      const sidBox = document.getElementById("sidBox")
+      const out = document.getElementById("out")
+      const go = document.getElementById("go")
 
-  const assertion = {
-    id: cred.id,
-    type: cred.type,
-    rawId: Array.from(new Uint8Array(cred.rawId)),
-    response:{
-      clientDataJSON: Array.from(new Uint8Array(cred.response.clientDataJSON)),
-      authenticatorData: Array.from(new Uint8Array(cred.response.authenticatorData)),
-      signature: Array.from(new Uint8Array(cred.response.signature))
-    }
-  }
+      if (sid && sig) {
+        sidBox.textContent = sid
+        go.disabled = false
+      } else {
+        sidBox.textContent = "(missing sid)"
+        out.textContent = "Open this page with ?sid=TEST&sig=TEST"
+      }
 
-  const verify = await fetch(base + "/functions/v1/verify-assertion",{
-    method:"POST",
-    headers:{ "content-type":"application/json"},
-    body: JSON.stringify({ sid, sig, assertion })
-  })
+      const base = "https://YOUR_PROJECT_REF.supabase.co"
 
-  const result = await verify.json()
-  document.getElementById("out").textContent = JSON.stringify(result,null,2)
-}
+      function toB64Url(u8) {
+        let s = ""
+        u8.forEach(b => s += String.fromCharCode(b))
+        return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")
+      }
 
-document.getElementById("go").addEventListener("click", () => startPasskey())
-</script>
-</body>
-</html>`
+      async function startPasskey() {
+        try {
+          out.textContent = "Creating challenge..."
+          const chRes = await fetch(base + "/functions/v1/create-challenge", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ sid, sig })
+          })
+          const ch = await chRes.json()
+          if (!chRes.ok) throw new Error("create-challenge failed: " + JSON.stringify(ch))
 
-  return new Response(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-store",
-    }
-  })
-})
+          out.textContent = "Requesting passkey..."
+          const publicKey = ch.publicKey || ch
+          const cred = await navigator.credentials.get({ publicKey })
+
+          const assertion = {
+            id: cred.id,
+            type: cred.type,
+            rawId: Array.from(new Uint8Array(cred.rawId)),
+            response: {
+              clientDataJSON: Array.from(new Uint8Array(cred.response.clientDataJSON)),
+              authenticatorData: Array.from(new Uint8Array(cred.response.authenticatorData)),
+              signature: Array.from(new Uint8Array(cred.response.signature)),
+              userHandle: cred.response.userHandle ? Array.from(new Uint8Array(cred.response.userHandle)) : null
+            }
+          }
+
+          out.textContent = "Verifying..."
+          const vRes = await fetch(base + "/functions/v1/verify-assertion", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ sid, sig, assertion })
+          })
+          const result = await vRes.json()
+          if (!vRes.ok) throw new Error("verify-assertion failed: " + JSON.stringify(result))
+
+          out.textContent = JSON.stringify(result, null, 2)
+        } catch (e) {
+          out.textContent = String(e && e.message ? e.message : e)
+        }
+      }
+
+      go.addEventListener("click", startPasskey)
+    </script>
+  </body>
+</html>
