@@ -1,100 +1,142 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SIRA Secure Handshake</title>
-    <style>
-      body { font-family: system-ui, Arial, sans-serif; margin: 32px; }
-      .card { max-width: 720px; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
-      button { padding: 10px 14px; font-size: 16px; cursor: pointer; }
-      pre { background: #f6f6f6; padding: 12px; border-radius: 8px; overflow: auto; }
-      .muted { color: #666; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <h1>SIRA Secure Handshake</h1>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SIRA Secure Handshake</title>
 
-      <p class="muted">Session ID</p>
-      <pre id="sidBox">(missing sid)</pre>
+<style>
+body{
+  font-family: Arial, sans-serif;
+  margin:40px;
+}
+.card{
+  max-width:700px;
+  border:1px solid #ddd;
+  padding:20px;
+  border-radius:10px;
+}
+button{
+  padding:10px 16px;
+  font-size:16px;
+}
+pre{
+  background:#f5f5f5;
+  padding:10px;
+}
+</style>
+</head>
 
-      <button id="go" disabled>Start passkey handshake</button>
+<body>
 
-      <h3>Output</h3>
-      <pre id="out">(no action yet)</pre>
-    </div>
+<div class="card">
 
-    <script>
-      const params = new URLSearchParams(window.location.search)
-      const sid = params.get("sid")
-      const sig = params.get("sig")
+<h1>SIRA Secure Handshake</h1>
 
-      const sidBox = document.getElementById("sidBox")
-      const out = document.getElementById("out")
-      const go = document.getElementById("go")
+<p>Session ID</p>
+<pre id="sid">(missing)</pre>
 
-      if (sid && sig) {
-        sidBox.textContent = sid
-        go.disabled = false
-      } else {
-        sidBox.textContent = "(missing sid)"
-        out.textContent = "Open this page with ?sid=TEST&sig=TEST"
-      }
+<button id="start">Start passkey handshake</button>
 
-      const base = "https://ubookoijqdmrxdlxldxf.supabase.co"
+<h3>Output</h3>
+<pre id="out">Waiting...</pre>
 
-      function toB64Url(u8) {
-        let s = ""
-        u8.forEach(b => s += String.fromCharCode(b))
-        return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")
-      }
+</div>
 
-      async function startPasskey() {
-        try {
-          out.textContent = "Creating challenge..."
-          const chRes = await fetch(base + "/functions/v1/create-challenge", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ sid, sig })
-          })
-          const ch = await chRes.json()
-          if (!chRes.ok) throw new Error("create-challenge failed: " + JSON.stringify(ch))
+<script>
 
-          out.textContent = "Requesting passkey..."
-          const publicKey = ch.publicKey || ch
-          const cred = await navigator.credentials.get({ publicKey })
+const params = new URLSearchParams(window.location.search)
 
-          const assertion = {
-            id: cred.id,
-            type: cred.type,
-            rawId: Array.from(new Uint8Array(cred.rawId)),
-            response: {
-              clientDataJSON: Array.from(new Uint8Array(cred.response.clientDataJSON)),
-              authenticatorData: Array.from(new Uint8Array(cred.response.authenticatorData)),
-              signature: Array.from(new Uint8Array(cred.response.signature)),
-              userHandle: cred.response.userHandle ? Array.from(new Uint8Array(cred.response.userHandle)) : null
-            }
-          }
+const sid = params.get("sid")
+const sig = params.get("sig")
 
-          out.textContent = "Verifying..."
-          const vRes = await fetch(base + "/functions/v1/verify-assertion", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ sid, sig, assertion })
-          })
-          const result = await vRes.json()
-          if (!vRes.ok) throw new Error("verify-assertion failed: " + JSON.stringify(result))
+document.getElementById("sid").textContent = sid || "(missing)"
 
-          out.textContent = JSON.stringify(result, null, 2)
-        } catch (e) {
-          out.textContent =
-  "Error: " + String(e && e.message ? e.message : e) + "\n" +
-  "Tip: check DevTools Network tab for the failed request."
-        }
-      }
+const out = document.getElementById("out")
 
-      go.addEventListener("click", startPasskey)
-    </script>
-  </body>
+/* -------------------------------------
+PASTE YOUR SUPABASE URL HERE
+------------------------------------- */
+
+const base = "https://ubookoijqdmrxdlxldxf.supabase.co"
+
+/* ------------------------------------- */
+
+async function startHandshake(){
+
+try{
+
+out.textContent = "Calling create-challenge..."
+
+const challengeResponse = await fetch(
+base + "/functions/v1/create-challenge",
+{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+sid:sid,
+sig:sig
+})
+}
+)
+
+const challenge = await challengeResponse.json()
+
+if(!challengeResponse.ok){
+out.textContent = "create-challenge failed:\n" + JSON.stringify(challenge,null,2)
+return
+}
+
+out.textContent = "Requesting passkey..."
+
+const cred = await navigator.credentials.get({
+publicKey: challenge.publicKey || challenge
+})
+
+const assertion = {
+id:cred.id,
+type:cred.type,
+rawId:Array.from(new Uint8Array(cred.rawId)),
+response:{
+clientDataJSON:Array.from(new Uint8Array(cred.response.clientDataJSON)),
+authenticatorData:Array.from(new Uint8Array(cred.response.authenticatorData)),
+signature:Array.from(new Uint8Array(cred.response.signature))
+}
+}
+
+out.textContent = "Calling verify-assertion..."
+
+const verifyResponse = await fetch(
+base + "/functions/v1/verify-assertion",
+{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+sid:sid,
+sig:sig,
+assertion:assertion
+})
+}
+)
+
+const verify = await verifyResponse.json()
+
+out.textContent = JSON.stringify(verify,null,2)
+
+}catch(e){
+
+out.textContent = "ERROR:\n" + e
+
+}
+
+}
+
+document.getElementById("start").onclick = startHandshake
+
+</script>
+
+</body>
 </html>
