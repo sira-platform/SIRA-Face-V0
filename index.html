@@ -313,8 +313,9 @@
 
 <script>
   // ─── CONFIG ────────────────────────────────────────────────────────────────
-  const SUPABASE_URL = "https://ubookoijqdmrxdlxldxf.supabase.co";
-  const FUNCTIONS_BASE = `${SUPABASE_URL}/functions/v1`;
+  const SUPABASE_URL      = "https://ubookoijqdmrxdlxldxf.supabase.co";
+  const FUNCTIONS_BASE    = `${SUPABASE_URL}/functions/v1`;
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVib29rb2lqcWRtcnhkbHhsZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4OTY2MzYsImV4cCI6MjA4NjQ3MjYzNn0.vCsN8B-kVYlzhsp3nfzYvzzEfLSLln7fCXolh8gE9fo";
 
   // ─── PARSE URL PARAMS ──────────────────────────────────────────────────────
   const params  = new URLSearchParams(window.location.search);
@@ -384,7 +385,7 @@
 
       const challengeRes = await fetch(`${FUNCTIONS_BASE}/create-challenge`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
         body:    JSON.stringify({ sid: SESSION_ID, sig: SIG }),
       });
 
@@ -449,7 +450,7 @@
 
       const verifyRes = await fetch(`${FUNCTIONS_BASE}/verify-assertion`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
         body:    JSON.stringify(assertionPayload),
       });
 
