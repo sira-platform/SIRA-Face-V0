@@ -1,142 +1,114 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>SIRA Secure Handshake</title>
-
-<style>
-body{
-  font-family: Arial, sans-serif;
-  margin:40px;
-}
-.card{
-  max-width:700px;
-  border:1px solid #ddd;
-  padding:20px;
-  border-radius:10px;
-}
-button{
-  padding:10px 16px;
-  font-size:16px;
-}
-pre{
-  background:#f5f5f5;
-  padding:10px;
-}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SIRA Secure Handshake</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 28px; }
+    .card { max-width: 720px; border: 1px solid #ddd; border-radius: 12px; padding: 18px; }
+    button { padding: 10px 14px; font-size: 16px; cursor: pointer; }
+    pre { background: #f5f5f5; padding: 10px; border-radius: 8px; overflow: auto; }
+    .row { margin: 10px 0; }
+  </style>
 </head>
-
 <body>
+  <div class="card">
+    <h1>SIRA Secure Handshake</h1>
 
-<div class="card">
+    <div class="row">Session ID</div>
+    <pre id="sidBox">(missing)</pre>
 
-<h1>SIRA Secure Handshake</h1>
+    <button id="go" disabled>Start passkey handshake</button>
 
-<p>Session ID</p>
-<pre id="sid">(missing)</pre>
+    <h3>Output</h3>
+    <pre id="out">Ready</pre>
+  </div>
 
-<button id="start">Start passkey handshake</button>
+  <script>
+    const out = document.getElementById("out")
+    const sidBox = document.getElementById("sidBox")
+    const go = document.getElementById("go")
 
-<h3>Output</h3>
-<pre id="out">Waiting...</pre>
+    const params = new URLSearchParams(window.location.search)
+    const sid = params.get("sid")
+    const sig = params.get("sig")
 
-</div>
+    sidBox.textContent = sid || "(missing sid)"
 
-<script>
+    if (!sid || !sig) {
+      out.textContent = "Open with ?sid=TEST&sig=TEST"
+    } else {
+      go.disabled = false
+    }
 
-const params = new URLSearchParams(window.location.search)
+    // Put your Supabase Project URL here, example:
+    // const SUPABASE_BASE = "https://ubookoijqdmrxdlxldxf.supabase.co"
+    const SUPABASE_BASE = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE"
 
-const sid = params.get("sid")
-const sig = params.get("sig")
+    async function postJson(url, payload) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      const text = await res.text()
+      let data
+      try { data = JSON.parse(text) } catch { data = { raw: text } }
+      return { ok: res.ok, status: res.status, data }
+    }
 
-document.getElementById("sid").textContent = sid || "(missing)"
+    function u8ToArr(buf) {
+      return Array.from(new Uint8Array(buf))
+    }
 
-const out = document.getElementById("out")
+    async function start() {
+      try {
+        if (!sid || !sig) {
+          out.textContent = "Missing sid or sig"
+          return
+        }
+        if (!SUPABASE_BASE.startsWith("https://") || !SUPABASE_BASE.includes(".supabase.co")) {
+          out.textContent = "Supabase base URL is not set correctly."
+          return
+        }
 
-/* -------------------------------------
-PASTE YOUR SUPABASE URL HERE
-------------------------------------- */
+        out.textContent = "Calling: " + SUPABASE_BASE + "/functions/v1/create-challenge"
 
-const base = "https://ubookoijqdmrxdlxldxf.supabase.co"
+        const ch = await postJson(SUPABASE_BASE + "/functions/v1/create-challenge", { sid, sig })
+        if (!ch.ok) {
+          out.textContent = "create-challenge failed. Status " + ch.status + "\n" + JSON.stringify(ch.data, null, 2)
+          return
+        }
 
-/* ------------------------------------- */
+        const publicKey = ch.data.publicKey || ch.data
 
-async function startHandshake(){
+        out.textContent = "Requesting passkey..."
+        const cred = await navigator.credentials.get({ publicKey })
 
-try{
+        const assertion = {
+          id: cred.id,
+          type: cred.type,
+          rawId: u8ToArr(cred.rawId),
+          response: {
+            clientDataJSON: u8ToArr(cred.response.clientDataJSON),
+            authenticatorData: u8ToArr(cred.response.authenticatorData),
+            signature: u8ToArr(cred.response.signature),
+            userHandle: cred.response.userHandle ? u8ToArr(cred.response.userHandle) : null
+          }
+        }
 
-out.textContent = "Calling create-challenge..."
+        out.textContent = "Calling: " + SUPABASE_BASE + "/functions/v1/verify-assertion"
 
-const challengeResponse = await fetch(
-base + "/functions/v1/create-challenge",
-{
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-sid:sid,
-sig:sig
-})
-}
-)
+        const vr = await postJson(SUPABASE_BASE + "/functions/v1/verify-assertion", { sid, sig, assertion })
+        out.textContent = "verify-assertion. Status " + vr.status + "\n" + JSON.stringify(vr.data, null, 2)
 
-const challenge = await challengeResponse.json()
+      } catch (e) {
+        out.textContent = "ERROR\n" + String(e && e.message ? e.message : e)
+      }
+    }
 
-if(!challengeResponse.ok){
-out.textContent = "create-challenge failed:\n" + JSON.stringify(challenge,null,2)
-return
-}
-
-out.textContent = "Requesting passkey..."
-
-const cred = await navigator.credentials.get({
-publicKey: challenge.publicKey || challenge
-})
-
-const assertion = {
-id:cred.id,
-type:cred.type,
-rawId:Array.from(new Uint8Array(cred.rawId)),
-response:{
-clientDataJSON:Array.from(new Uint8Array(cred.response.clientDataJSON)),
-authenticatorData:Array.from(new Uint8Array(cred.response.authenticatorData)),
-signature:Array.from(new Uint8Array(cred.response.signature))
-}
-}
-
-out.textContent = "Calling verify-assertion..."
-
-const verifyResponse = await fetch(
-base + "/functions/v1/verify-assertion",
-{
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-sid:sid,
-sig:sig,
-assertion:assertion
-})
-}
-)
-
-const verify = await verifyResponse.json()
-
-out.textContent = JSON.stringify(verify,null,2)
-
-}catch(e){
-
-out.textContent = "ERROR:\n" + e
-
-}
-
-}
-
-document.getElementById("start").onclick = startHandshake
-
-</script>
-
+    go.addEventListener("click", start)
+  </script>
 </body>
 </html>
