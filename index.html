@@ -1,478 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SIRA Secure Handshake</title>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:        #0b0e14;
-      --surface:   #111520;
-      --border:    #1e2535;
-      --accent:    #00e5ff;
-      --accent2:   #0066ff;
-      --text:      #c8d6e5;
-      --muted:     #4a5568;
-      --success:   #00c896;
-      --error:     #ff4466;
-      --warn:      #ffaa00;
-      --mono:      'IBM Plex Mono', monospace;
-      --sans:      'IBM Plex Sans', sans-serif;
-    }
-
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 15px;
-      line-height: 1.6;
-    }
-
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 2rem 1rem;
-      background-image:
-        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,102,255,0.12) 0%, transparent 60%),
-        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(30,37,53,0.4) 39px, rgba(30,37,53,0.4) 40px),
-        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(30,37,53,0.4) 39px, rgba(30,37,53,0.4) 40px);
-    }
-
-    .card {
-      width: 100%;
-      max-width: 560px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 2.5rem 2.5rem 2rem;
-      position: relative;
-      box-shadow: 0 0 60px rgba(0,102,255,0.07), 0 2px 40px rgba(0,0,0,0.6);
-    }
-
-    /* top accent bar */
-    .card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, var(--accent2), var(--accent), transparent);
-      border-radius: 4px 4px 0 0;
-    }
-
-    /* corner marks */
-    .card::after {
-      content: '';
-      position: absolute;
-      bottom: 0; right: 0;
-      width: 40px; height: 40px;
-      border-bottom: 1px solid var(--accent2);
-      border-right: 1px solid var(--accent2);
-      border-radius: 0 0 4px 0;
-      opacity: 0.4;
-    }
-
-    /* ── Header ── */
-    .header {
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-
-    .logo {
-      width: 38px; height: 38px;
-      background: linear-gradient(135deg, var(--accent2), var(--accent));
-      border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-      box-shadow: 0 0 20px rgba(0,102,255,0.35);
-    }
-
-    .logo svg { width: 20px; height: 20px; fill: #fff; }
-
-    .title-block { flex: 1; }
-
-    h1 {
-      font-family: var(--mono);
-      font-size: 1.15rem;
-      font-weight: 600;
-      color: #fff;
-      letter-spacing: 0.04em;
-      line-height: 1.2;
-    }
-
-    .subtitle {
-      font-size: 0.78rem;
-      color: var(--muted);
-      font-family: var(--mono);
-      margin-top: 3px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    /* ── Field ── */
-    .field { margin-bottom: 1.5rem; }
-
-    label {
-      display: block;
-      font-size: 0.72rem;
-      font-family: var(--mono);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      margin-bottom: 0.4rem;
-    }
-
-    .value-box {
-      background: rgba(0,0,0,0.3);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 0.6rem 0.9rem;
-      font-family: var(--mono);
-      font-size: 0.88rem;
-      color: var(--accent);
-      letter-spacing: 0.03em;
-      min-height: 2.4rem;
-      display: flex;
-      align-items: center;
-    }
-
-    /* ── Button ── */
-    .btn {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55rem;
-      background: transparent;
-      border: 1px solid var(--accent2);
-      color: var(--accent);
-      font-family: var(--mono);
-      font-size: 0.85rem;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      padding: 0.7rem 1.6rem;
-      border-radius: 3px;
-      cursor: pointer;
-      transition: background 0.2s, box-shadow 0.2s, color 0.2s;
-      overflow: hidden;
-      margin-bottom: 2rem;
-    }
-
-    .btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(90deg, var(--accent2), var(--accent));
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-
-    .btn:hover::before { opacity: 0.12; }
-    .btn:hover { box-shadow: 0 0 18px rgba(0,102,255,0.3); color: #fff; }
-    .btn:active { transform: scale(0.98); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    .btn span { position: relative; }
-
-    .btn-icon { position: relative; width: 16px; height: 16px; }
-
-    /* spinner */
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner {
-      display: none;
-      width: 14px; height: 14px;
-      border: 2px solid rgba(0,229,255,0.2);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
-    .btn.loading .btn-icon-default { display: none; }
-    .btn.loading .spinner { display: block; }
-
-    /* ── Output ── */
-    .output-label {
-      font-size: 0.72rem;
-      font-family: var(--mono);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      margin-bottom: 0.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .status-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--muted);
-      transition: background 0.3s;
-      flex-shrink: 0;
-    }
-    .status-dot.ok    { background: var(--success); box-shadow: 0 0 8px var(--success); }
-    .status-dot.err   { background: var(--error);   box-shadow: 0 0 8px var(--error); }
-    .status-dot.busy  { background: var(--warn);    box-shadow: 0 0 8px var(--warn); animation: pulse 1s infinite; }
-
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-    .output-box {
-      background: rgba(0,0,0,0.4);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 1rem 1.1rem;
-      font-family: var(--mono);
-      font-size: 0.8rem;
-      line-height: 1.7;
-      color: var(--text);
-      min-height: 80px;
-      white-space: pre-wrap;
-      word-break: break-all;
-      max-height: 260px;
-      overflow-y: auto;
-    }
-
-    .output-box .line-ok   { color: var(--success); }
-    .output-box .line-err  { color: var(--error); }
-    .output-box .line-info { color: var(--accent); }
-    .output-box .line-muted{ color: var(--muted); }
-
-    /* scrollbar */
-    .output-box::-webkit-scrollbar { width: 4px; }
-    .output-box::-webkit-scrollbar-track { background: transparent; }
-    .output-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    /* ── Footer ── */
-    .footer {
-      margin-top: 1.5rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .badge {
-      font-family: var(--mono);
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      background: rgba(255,255,255,0.03);
-      border: 1px solid var(--border);
-      border-radius: 2px;
-      padding: 0.25rem 0.5rem;
-    }
+    body { font-family: Arial, sans-serif; margin: 28px; }
+    .card { max-width: 720px; border: 1px solid #ddd; border-radius: 12px; padding: 18px; }
+    button { padding: 10px 14px; font-size: 16px; cursor: pointer; }
+    pre { background: #f5f5f5; padding: 10px; border-radius: 8px; overflow: auto; }
+    .row { margin: 10px 0; }
   </style>
 </head>
 <body>
+  <div class="card">
+    <h1>SIRA Secure Handshake</h1>
 
-<div class="card">
-  <div class="header">
-    <div class="logo">
-      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5L12 1zm0 4l5 2.18V11c0 3.5-2.33 6.79-5 7.93-2.67-1.14-5-4.43-5-7.93V7.18L12 5z"/></svg>
-    </div>
-    <div class="title-block">
-      <h1>SIRA · Secure Handshake</h1>
-      <div class="subtitle">WebAuthn / Passkey Authentication</div>
-    </div>
+    <div class="row">Session ID</div>
+    <pre id="sidBox">(missing)</pre>
+
+    <button id="go" disabled>Start passkey handshake</button>
+
+    <h3>Output</h3>
+    <pre id="out">Ready</pre>
   </div>
 
-  <div class="field">
-    <label>Session ID</label>
-    <div class="value-box" id="display-sid">—</div>
-  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search)
+    const sid = params.get("sid")
+    const sig = params.get("sig")
 
-  <button class="btn" id="startBtn" onclick="startHandshake()">
-    <span class="btn-icon">
-      <svg class="btn-icon-default" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-      </svg>
-      <div class="spinner"></div>
-    </span>
-    <span>Start passkey handshake</span>
-  </button>
+    const sidBox = document.getElementById("sidBox")
+    const out = document.getElementById("out")
+    const go = document.getElementById("go")
 
-  <div class="output-label">
-    <div class="status-dot" id="statusDot"></div>
-    Output
-  </div>
-  <div class="output-box" id="output">Awaiting handshake…</div>
+    sidBox.textContent = sid || "(missing sid)"
 
-  <div class="footer">
-    <span class="badge">SIRA v1</span>
-    <span class="badge">Supabase · WebAuthn L2</span>
-  </div>
-</div>
-
-<script>
-  // ─── CONFIG ────────────────────────────────────────────────────────────────
-  const SUPABASE_URL      = "https://ubookoijqdmrxdlxldxf.supabase.co";
-  const FUNCTIONS_BASE    = `${SUPABASE_URL}/functions/v1`;
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVib29rb2lqcWRtcnhkbHhsZHhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4OTY2MzYsImV4cCI6MjA4NjQ3MjYzNn0.vCsN8B-kVYlzhsp3nfzYvzzEfLSLln7fCXolh8gE9fo";
-
-  // ─── PARSE URL PARAMS ──────────────────────────────────────────────────────
-  const params  = new URLSearchParams(window.location.search);
-  const SESSION_ID = params.get("sid") || "";
-  const SIG        = params.get("sig") || "";
-
-  document.getElementById("display-sid").textContent = SESSION_ID || "(none)";
-
-  // ─── OUTPUT HELPERS ────────────────────────────────────────────────────────
-  const outputEl  = document.getElementById("output");
-  const statusDot = document.getElementById("statusDot");
-  const startBtn  = document.getElementById("startBtn");
-
-  function log(msg, type = "info") {
-    const line = document.createElement("div");
-    line.className = `line-${type}`;
-    line.textContent = msg;
-    if (outputEl.textContent === "Awaiting handshake…") outputEl.textContent = "";
-    outputEl.appendChild(line);
-    outputEl.scrollTop = outputEl.scrollHeight;
-  }
-
-  function clearLog() {
-    outputEl.innerHTML = "";
-  }
-
-  function setStatus(state) {
-    statusDot.className = "status-dot " + state;
-  }
-
-  function setBusy(busy) {
-    startBtn.disabled = busy;
-    startBtn.classList.toggle("loading", busy);
-  }
-
-  // ─── BASE64URL HELPERS ─────────────────────────────────────────────────────
-  function base64urlToBuffer(base64url) {
-    const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
-    const padded  = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=");
-    const binary  = atob(padded);
-    const buffer  = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
-    return buffer.buffer;
-  }
-
-  function bufferToBase64url(buffer) {
-    const bytes  = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-  }
-
-  // ─── MAIN FLOW ─────────────────────────────────────────────────────────────
-  async function startHandshake() {
-    clearLog();
-    setBusy(true);
-    setStatus("busy");
-
-    try {
-      // ── Validate session ──────────────────────────────────────────────────
-      if (!SESSION_ID) {
-        throw new Error("No session ID found in URL (?sid=…)");
-      }
-
-      // ── Step 1 · create-challenge ─────────────────────────────────────────
-      log("→ Requesting challenge from Supabase…", "info");
-
-      const challengeRes = await fetch(`${FUNCTIONS_BASE}/create-challenge`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
-        body:    JSON.stringify({ sid: SESSION_ID, sig: SIG }),
-      });
-
-      if (!challengeRes.ok) {
-        const errText = await challengeRes.text().catch(() => challengeRes.statusText);
-        throw new Error(`create-challenge failed (${challengeRes.status}): ${errText}`);
-      }
-
-      const challengeData = await challengeRes.json();
-      log("← Challenge received.", "ok");
-
-      // Expected shape: { challenge: "<base64url>", rpId: "...", allowCredentials: [...] }
-      const rawChallenge    = challengeData.challenge;
-      const rpId            = challengeData.rpId    || window.location.hostname;
-      const allowCredentials = challengeData.allowCredentials || [];
-
-      if (!rawChallenge) throw new Error("Response missing 'challenge' field.");
-      log(`   challenge: ${rawChallenge.slice(0, 20)}…`, "muted");
-      log(`   rpId:      ${rpId}`, "muted");
-
-      // ── Step 2 · navigator.credentials.get ───────────────────────────────
-      log("→ Invoking passkey prompt…", "info");
-
-      const publicKeyOptions = {
-        challenge:        base64urlToBuffer(rawChallenge),
-        rpId:             rpId,
-        allowCredentials: allowCredentials.map(c => ({
-          type: "public-key",
-          id:   base64urlToBuffer(c.id),
-        })),
-        userVerification: "preferred",
-        timeout:          60000,
-      };
-
-      let assertion;
-      try {
-        assertion = await navigator.credentials.get({ publicKey: publicKeyOptions });
-      } catch (credErr) {
-        throw new Error(`Passkey prompt failed: ${credErr.message}`);
-      }
-
-      log("← Assertion obtained from authenticator.", "ok");
-
-      // ── Step 3 · Serialize assertion ──────────────────────────────────────
-      const response = assertion.response;
-      const assertionPayload = {
-        sid:  SESSION_ID,
-        sig:  SIG,
-        id:        assertion.id,
-        rawId:     bufferToBase64url(assertion.rawId),
-        type:      assertion.type,
-        response:  {
-          authenticatorData: bufferToBase64url(response.authenticatorData),
-          clientDataJSON:    bufferToBase64url(response.clientDataJSON),
-          signature:         bufferToBase64url(response.signature),
-          userHandle:        response.userHandle ? bufferToBase64url(response.userHandle) : null,
-        },
-      };
-
-      // ── Step 4 · verify-assertion ─────────────────────────────────────────
-      log("→ Sending assertion for verification…", "info");
-
-      const verifyRes = await fetch(`${FUNCTIONS_BASE}/verify-assertion`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_ANON_KEY}` },
-        body:    JSON.stringify(assertionPayload),
-      });
-
-      if (!verifyRes.ok) {
-        const errText = await verifyRes.text().catch(() => verifyRes.statusText);
-        throw new Error(`verify-assertion failed (${verifyRes.status}): ${errText}`);
-      }
-
-      const verifyData = await verifyRes.json();
-      log("← Verification complete.", "ok");
-      log("", "muted");
-      log("✔  " + (verifyData.message || JSON.stringify(verifyData, null, 2)), "ok");
-      setStatus("ok");
-
-    } catch (err) {
-      log("", "muted");
-      log("✘  " + err.message, "err");
-      setStatus("err");
-    } finally {
-      setBusy(false);
+    if (!sid || !sig) {
+      out.textContent = "Open with ?sid=TEST&sig=TEST"
+    } else {
+      go.disabled = false
     }
-  }
-</script>
+
+    const SUPABASE_BASE = "https://ubookoijqdmrxdlxldxf.supabase.co"
+
+    async function postJson(url, payload) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      const text = await res.text()
+      let data
+      try { data = JSON.parse(text) } catch { data = { raw: text } }
+      return { ok: res.ok, status: res.status, data }
+    }
+
+    function u8ToArr(buf) {
+      return Array.from(new Uint8Array(buf))
+    }
+
+    async function start() {
+      try {
+        if (!sid || !sig) {
+          out.textContent = "Missing sid or sig"
+          return
+        }
+
+        out.textContent = "Calling create challenge..."
+        const ch = await postJson(SUPABASE_BASE + "/functions/v1/create-challenge", { sid, sig })
+
+        if (!ch.ok) {
+          out.textContent = "create challenge failed. Status " + ch.status + "\n" + JSON.stringify(ch.data, null, 2)
+          return
+        }
+
+        const publicKey = ch.data.publicKey || ch.data
+
+        out.textContent = "Requesting passkey..."
+        const cred = await navigator.credentials.get({ publicKey })
+
+        const assertion = {
+          id: cred.id,
+          type: cred.type,
+          rawId: u8ToArr(cred.rawId),
+          response: {
+            clientDataJSON: u8ToArr(cred.response.clientDataJSON),
+            authenticatorData: u8ToArr(cred.response.authenticatorData),
+            signature: u8ToArr(cred.response.signature),
+            userHandle: cred.response.userHandle ? u8ToArr(cred.response.userHandle) : null
+          }
+        }
+
+        out.textContent = "Calling confirm challenge..."
+        const vr = await postJson(SUPABASE_BASE + "/functions/v1/confirm-challenge", { sid, sig, assertion })
+
+        out.textContent = "confirm challenge. Status " + vr.status + "\n" + JSON.stringify(vr.data, null, 2)
+      } catch (e) {
+        out.textContent = "ERROR\n" + String(e && e.message ? e.message : e)
+      }
+    }
+
+    go.addEventListener("click", start)
+  </script>
 </body>
 </html>
