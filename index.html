@@ -88,7 +88,9 @@
 
           out.textContent = JSON.stringify(result, null, 2)
         } catch (e) {
-          out.textContent = String(e && e.message ? e.message : e)
+          out.textContent =
+  "Error: " + String(e && e.message ? e.message : e) + "\n" +
+  "Tip: check DevTools Network tab for the failed request."
         }
       }
 
