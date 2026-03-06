@@ -21,18 +21,18 @@ button:disabled { background:#aab2bd; cursor:default }
   <div class="card">
     <h2>SIRA Secure Verification</h2>
 
-    <div class="label">Verification Session</div>
-    <pre id="sid">loading</pre>
+    <div class="label">Verification Session ID</div>
+    <pre id="sid">Loading verification session...</pre>
 
     <p>
-      <button id="go" type="button">Start credential verification</button>
+      <button id="go" type="button">Start identity verification</button>
     </p>
 
-    <div class="label">Verification Status</div>
-    <pre id="out">Waiting for verification...</pre>
+    <div class="label">Verification Result</div>
+    <pre id="out">Waiting for identity verification...</pre>
 
     <div class="muted">
-      SIRA stores no personal data, only cryptographic credentials used for secure verification.
+      SIRA performs privacy-first verification. No personal identity data is stored. Only cryptographic credentials are used to confirm authorization.
     </div>
   </div>
 
@@ -40,9 +40,9 @@ button:disabled { background:#aab2bd; cursor:default }
 const params = new URLSearchParams(window.location.search)
 
 document.getElementById("sid").textContent =
-  params.get("sid") || "(missing session)"
+  params.get("sid") || "(verification session missing)"
 
-async function startPasskey() {
+async function startVerification() {
   const sid = params.get("sid")
   const sig = params.get("sig")
   const base = window.location.origin
@@ -50,7 +50,7 @@ async function startPasskey() {
   const btn = document.getElementById("go")
 
   if (!sid || !sig) {
-    out.textContent = "Missing required query params: sid and sig"
+    out.textContent = "Missing required query parameters: sid and sig"
     return
   }
 
@@ -121,7 +121,7 @@ async function startPasskey() {
   btn.disabled = false
 }
 
-document.getElementById("go").addEventListener("click", () => startPasskey())
+document.getElementById("go").addEventListener("click", () => startVerification())
 </script>
 </body>
 </html>`
