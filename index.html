@@ -1,199 +1,113 @@
-<!DOCTYPE html>
-<html lang="en">
+Deno.serve((_req: Request) => {
+
+const html = `<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SIRA Secure Handshake</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 640px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
-    .card { background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
-    h1 { color: #0D2B55; margin-bottom: 24px; }
-    label { font-weight: bold; display: block; margin-bottom: 6px; color: #333; }
-    .sid-box { background: #f0f0f0; padding: 10px 14px; border-radius: 6px; font-family: monospace; margin-bottom: 20px; word-break: break-all; }
-    button { background: #0A6655; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; }
-    button:hover { background: #0D2B55; }
-    button:disabled { background: #ccc; cursor: default; }
-    .output { margin-top: 24px; }
-    .output label { margin-bottom: 8px; }
-    pre { background: #f0f0f0; padding: 14px; border-radius: 6px; font-size: 13px; white-space: pre-wrap; word-break: break-all; min-height: 48px; border-left: 4px solid #ccc; }
-    pre.success { border-left-color: #1A7A44; background: #E9F7EF; color: #1A7A44; }
-    pre.error   { border-left-color: #9B2335; background: #FDEDEC; color: #9B2335; }
-    pre.info    { border-left-color: #1A5276; background: #EBF5FB; color: #1A5276; }
-    .privacy { margin-top: 20px; font-size: 12px; color: #888; text-align: center; }
-  </style>
+<meta charset="utf-8">
+<title>SIRA Secure Verification</title>
+
+<style>
+body { font-family: system-ui; margin:40px }
+button { padding:12px 20px; font-size:18px; cursor:pointer }
+pre { background:#eee; padding:10px; white-space:pre-wrap }
+</style>
+
 </head>
 <body>
-<div class="card">
-  <h1>SIRA Secure Handshake</h1>
 
-  <label>Session ID</label>
-  <div class="sid-box" id="sid-display">(loading…)</div>
+<h2>SIRA Secure Verification</h2>
 
-  <button id="btn" onclick="startHandshake()" disabled>Start passkey handshake</button>
+<p>Verification Session:</p>
+<pre id="sid">loading</pre>
 
-  <div class="output">
-    <label>Output</label>
-    <pre id="output" class="info">Waiting…</pre>
-  </div>
+<p>
+<button id="go" type="button">
+Start credential verification
+</button>
+</p>
 
-  <div class="privacy">SIRA stores no personal data — passkeys only.</div>
-</div>
+<p>Verification Status:</p>
+<pre id="out">Waiting for verification...</pre>
 
 <script>
-// ── Config ────────────────────────────────────────────────────────────────────
-// Your Supabase Functions base URL — already set correctly:
-const FUNCTIONS_BASE = "https://ubookoiqqdmrxdlxldxf.supabase.co/functions/v1";
 
-// ── Read URL parameters ───────────────────────────────────────────────────────
-const params = new URLSearchParams(location.search);
-const sid = params.get("sid");
-const sig = params.get("sig");
-const exp = params.get("exp");
+const params = new URLSearchParams(window.location.search)
 
-const display = document.getElementById("sid-display");
-const btn     = document.getElementById("btn");
-const output  = document.getElementById("output");
+document.getElementById("sid").textContent =
+  params.get("sid") || "(missing session)"
 
-function setOutput(msg, type) {
-  output.textContent = msg;
-  output.className = type; // "success", "error", or "info"
-}
+async function startPasskey(){
 
-// ── On load ───────────────────────────────────────────────────────────────────
-if (!sid || !sig) {
-  display.textContent = "(missing sid)";
-  setOutput("Open with ?sid=TEST&sig=TEST&exp=9999999999", "info");
-} else {
-  display.textContent = sid;
-  btn.disabled = false;
-  setOutput("Ready. Click the button to start.", "info");
-}
+  const sid = params.get("sid")
+  const sig = params.get("sig")
+  const base = window.location.origin
 
-// ── Helpers: base64url encode/decode ─────────────────────────────────────────
-function base64urlToUint8Array(b64url) {
-  // Convert base64url string → Uint8Array (what WebAuthn needs)
-  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = b64.length % 4 ? "=".repeat(4 - b64.length % 4) : "";
-  const binary = atob(b64 + pad);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
+  const r = await fetch(
+    base +
+    "/functions/v1/create-challenge?sid=" +
+    encodeURIComponent(sid) +
+    "&sig=" +
+    encodeURIComponent(sig)
+  )
 
-function uint8ArrayToBase64url(bytes) {
-  let binary = "";
-  bytes.forEach(b => binary += String.fromCharCode(b));
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-}
+  const j = await r.json()
 
-function arrayBufferToBase64url(buf) {
-  return uint8ArrayToBase64url(new Uint8Array(buf));
-}
-
-// ── Main flow ─────────────────────────────────────────────────────────────────
-async function startHandshake() {
-  btn.disabled = true;
-  setOutput("Connecting to SIRA…", "info");
-
-  // ── STEP 1: Get challenge from Supabase ──────────────────────────────────
-  let challengeData;
-  try {
-    const res = await fetch(`${FUNCTIONS_BASE}/create-challenge`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sid: sid,
-        exp: exp ? parseInt(exp) : 9999999999,
-        sig: sig
-      })
-    });
-    challengeData = await res.json();
-    if (!res.ok) {
-      setOutput("SIRA error: " + (challengeData.code || challengeData.error || res.status), "error");
-      btn.disabled = false;
-      return;
-    }
-  } catch (e) {
-    setOutput("Network error: " + e.message, "error");
-    btn.disabled = false;
-    return;
-  }
-
-  setOutput("Challenge received ✓\nAsking your device to sign…", "info");
-
-  // ── STEP 2: Build WebAuthn options with correct types ────────────────────
-  // The challenge MUST be a Uint8Array — convert from base64url string
-  const challenge_id = challengeData.challenge_id;
+  const challenge = Uint8Array.from(
+    atob(j.challenge.replace(/-/g,"+").replace(/_/g,"/")),
+    c => c.charCodeAt(0)
+  )
 
   const publicKey = {
-    challenge: base64urlToUint8Array(challengeData.challenge),
-    rpId:      challengeData.rpId || challengeData.rp?.id,
-    timeout:   90000,
-    userVerification: "required",
-    allowCredentials: (challengeData.allowCredentials || []).map(c => ({
-      type: "public-key",
-      id:   base64urlToUint8Array(typeof c.id === "string" ? c.id : uint8ArrayToBase64url(new Uint8Array(c.id)))
-    }))
-  };
-
-  // ── STEP 3: Ask device to sign ───────────────────────────────────────────
-  let assertion;
-  try {
-    const credential = await navigator.credentials.get({ publicKey });
-    if (!credential) {
-      setOutput("No passkey found. Your device needs a passkey registered for this site first.", "error");
-      btn.disabled = false;
-      return;
-    }
-
-    // Convert response to base64url for sending to server
-    assertion = {
-      id:    credential.id,
-      rawId: arrayBufferToBase64url(credential.rawId),
-      type:  credential.type,
-      response: {
-        authenticatorData: arrayBufferToBase64url(credential.response.authenticatorData),
-        clientDataJSON:    arrayBufferToBase64url(credential.response.clientDataJSON),
-        signature:         arrayBufferToBase64url(credential.response.signature),
-        userHandle:        credential.response.userHandle
-          ? arrayBufferToBase64url(credential.response.userHandle)
-          : null
-      }
-    };
-  } catch (e) {
-    if (e.name === "NotAllowedError") {
-      setOutput("You cancelled the passkey prompt.\nClick the button to try again.", "error");
-    } else if (e.name === "InvalidStateError") {
-      setOutput("No passkey registered for this device yet.\nA real session must be created by the sector system first.", "error");
-    } else {
-      setOutput("Device error: " + e.message, "error");
-    }
-    btn.disabled = false;
-    return;
+    challenge: challenge,
+    timeout: j.timeoutMs,
+    rpId: j.rpId,
+    userVerification: j.userVerification
   }
 
-  setOutput("Passkey signed ✓\nVerifying with SIRA…", "info");
+  const cred = await navigator.credentials.get({ publicKey })
 
-  // ── STEP 4: Send assertion to verify-assertion ───────────────────────────
-  try {
-    const res = await fetch(`${FUNCTIONS_BASE}/verify-assertion`, {
+  const assertion = {
+    id: cred.id,
+    type: cred.type,
+    rawId: Array.from(new Uint8Array(cred.rawId)),
+    response:{
+      clientDataJSON: Array.from(new Uint8Array(cred.response.clientDataJSON)),
+      authenticatorData: Array.from(new Uint8Array(cred.response.authenticatorData)),
+      signature: Array.from(new Uint8Array(cred.response.signature))
+    }
+  }
+
+  const verify = await fetch(
+    base + "/functions/v1/verify-assertion",
+    {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ challenge_id, assertion })
-    });
-    const result = await res.json();
-
-    if (res.ok && result.result === "ALLOW") {
-      setOutput("✅ ACCESS GRANTED\n\nSession: " + result.session_id + "\nLevel: " + result.assurance_level, "success");
-    } else {
-      setOutput("❌ ACCESS DENIED\nCode: " + (result.code || result.error || res.status), "error");
+      headers: { "content-type":"application/json" },
+      body: JSON.stringify({ sid, sig, assertion })
     }
-  } catch (e) {
-    setOutput("Verify error: " + e.message, "error");
-  }
+  )
 
-  btn.disabled = false;
+  const result = await verify.json()
+
+  document.getElementById("out").textContent =
+    JSON.stringify(result,null,2)
+
 }
+
+document
+  .getElementById("go")
+  .addEventListener("click", () => startPasskey())
+
 </script>
+
 </body>
-</html>
+</html>`
+
+return new Response(html,{
+  status: 200,
+  headers:{
+    "Content-Type":"text/html; charset=utf-8",
+    "Cache-Control":"no-store"
+  }
+})
+
+})
