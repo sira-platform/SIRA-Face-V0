@@ -1,113 +1,192 @@
 Deno.serve((_req: Request) => {
-
-const html = `<!DOCTYPE html>
-<html>
+  const html = `<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>SIRA Secure Verification</title>
-
-<style>
-body { font-family: system-ui; margin:40px }
-button { padding:12px 20px; font-size:18px; cursor:pointer }
-pre { background:#eee; padding:10px; white-space:pre-wrap }
-</style>
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIRA Secure Verification</title>
+  <style>
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      margin: 40px;
+      background: #f6f7f9;
+      color: #10243e;
+    }
+    .card {
+      max-width: 680px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    h2 {
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+    .label {
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    pre {
+      background: #eef2f7;
+      padding: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-radius: 8px;
+      min-height: 24px;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 18px;
+      cursor: pointer;
+      border: 0;
+      border-radius: 10px;
+      background: #0a6655;
+      color: white;
+      font-weight: 700;
+      width: 100%;
+    }
+    button:hover {
+      background: #0d2b55;
+    }
+    button:disabled {
+      background: #aab2bd;
+      cursor: default;
+    }
+    .muted {
+      color: #667085;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+  </style>
 </head>
 <body>
+  <div class="card">
+    <h2>SIRA Secure Verification</h2>
 
-<h2>SIRA Secure Verification</h2>
+    <div class="label">Verification Session</div>
+    <pre id="sid">loading</pre>
 
-<p>Verification Session:</p>
-<pre id="sid">loading</pre>
+    <p>
+      <button id="go" type="button">Start credential verification</button>
+    </p>
 
-<p>
-<button id="go" type="button">
-Start credential verification
-</button>
-</p>
+    <div class="label">Verification Status</div>
+    <pre id="out">Waiting for verification...</pre>
 
-<p>Verification Status:</p>
-<pre id="out">Waiting for verification...</pre>
+    <div class="muted">
+      SIRA stores no personal data, only cryptographic credentials used for secure verification.
+    </div>
+  </div>
 
 <script>
-
-const params = new URLSearchParams(window.location.search)
+const params = new URLSearchParams(window.location.search);
 
 document.getElementById("sid").textContent =
-  params.get("sid") || "(missing session)"
+  params.get("sid") || "(missing session)";
 
-async function startPasskey(){
+async function startPasskey() {
+  const sid = params.get("sid");
+  const sig = params.get("sig");
+  const base = window.location.origin;
+  const out = document.getElementById("out");
+  const btn = document.getElementById("go");
 
-  const sid = params.get("sid")
-  const sig = params.get("sig")
-  const base = window.location.origin
-
-  const r = await fetch(
-    base +
-    "/functions/v1/create-challenge?sid=" +
-    encodeURIComponent(sid) +
-    "&sig=" +
-    encodeURIComponent(sig)
-  )
-
-  const j = await r.json()
-
-  const challenge = Uint8Array.from(
-    atob(j.challenge.replace(/-/g,"+").replace(/_/g,"/")),
-    c => c.charCodeAt(0)
-  )
-
-  const publicKey = {
-    challenge: challenge,
-    timeout: j.timeoutMs,
-    rpId: j.rpId,
-    userVerification: j.userVerification
+  if (!sid || !sig) {
+    out.textContent = "Missing sid or sig in URL.";
+    return;
   }
 
-  const cred = await navigator.credentials.get({ publicKey })
+  btn.disabled = true;
+  out.textContent = "Requesting verification challenge...";
 
-  const assertion = {
-    id: cred.id,
-    type: cred.type,
-    rawId: Array.from(new Uint8Array(cred.rawId)),
-    response:{
-      clientDataJSON: Array.from(new Uint8Array(cred.response.clientDataJSON)),
-      authenticatorData: Array.from(new Uint8Array(cred.response.authenticatorData)),
-      signature: Array.from(new Uint8Array(cred.response.signature))
+  try {
+    const r = await fetch(
+      base +
+      "/functions/v1/create-challenge?sid=" +
+      encodeURIComponent(sid) +
+      "&sig=" +
+      encodeURIComponent(sig)
+    );
+
+    const j = await r.json();
+
+    if (!r.ok) {
+      out.textContent = "Challenge error: " + JSON.stringify(j, null, 2);
+      btn.disabled = false;
+      return;
     }
+
+    const challenge = Uint8Array.from(
+      atob(j.challenge.replace(/-/g, "+").replace(/_/g, "/")),
+      c => c.charCodeAt(0)
+    );
+
+    const publicKey = {
+      challenge,
+      timeout: j.timeoutMs,
+      rpId: j.rpId,
+      userVerification: j.userVerification
+    };
+
+    out.textContent = "Challenge received. Waiting for device signature...";
+
+    const cred = await navigator.credentials.get({ publicKey });
+
+    const assertion = {
+      id: cred.id,
+      type: cred.type,
+      rawId: Array.from(new Uint8Array(cred.rawId)),
+      response: {
+        clientDataJSON: Array.from(new Uint8Array(cred.response.clientDataJSON)),
+        authenticatorData: Array.from(new Uint8Array(cred.response.authenticatorData)),
+        signature: Array.from(new Uint8Array(cred.response.signature))
+      }
+    };
+
+    out.textContent = "Credential signed. Verifying with SIRA...";
+
+    const verify = await fetch(
+      base + "/functions/v1/verify-assertion",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sid, sig, assertion })
+      }
+    );
+
+    const result = await verify.json();
+    out.textContent = JSON.stringify(result, null, 2);
+  } catch (err) {
+    out.textContent = "Runtime error: " + (err?.message || String(err));
   }
 
-  const verify = await fetch(
-    base + "/functions/v1/verify-assertion",
-    {
-      method: "POST",
-      headers: { "content-type":"application/json" },
-      body: JSON.stringify({ sid, sig, assertion })
-    }
-  )
-
-  const result = await verify.json()
-
-  document.getElementById("out").textContent =
-    JSON.stringify(result,null,2)
-
+  btn.disabled = false;
 }
 
-document
-  .getElementById("go")
-  .addEventListener("click", () => startPasskey())
-
+document.getElementById("go").addEventListener("click", () => startPasskey());
 </script>
-
 </body>
-</html>`
+</html>`;
 
-return new Response(html,{
-  status: 200,
-  headers:{
-    "Content-Type":"text/html; charset=utf-8",
-    "Cache-Control":"no-store"
-  }
-})
-
-})
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy":
+        "default-src 'self' https: data: blob:; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: https:; " +
+        "connect-src 'self' https:; " +
+        "frame-ancestors 'self'; " +
+        "base-uri 'self'; " +
+        "form-action 'self'"
+    }
+  });
+});
