@@ -1,126 +1,664 @@
 Deno.serve((_req: Request) => {
-  const html = `<!DOCTYPE html>
+  const html = `
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SIRA Secure Verification</title>
-<style>
-body{font-family:Arial,sans-serif;background:#f0f2f5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
-.card{background:#fff;border-radius:16px;padding:32px;max-width:440px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,.1)}
-h2{color:#0D2B55;margin:0 0 20px}
-.box{background:#f5f7fa;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:14px;margin:4px 0 18px;word-break:break-all}
-button{width:100%;padding:14px;font-size:16px;font-weight:700;background:#0A6655;color:#fff;border:none;border-radius:10px;cursor:pointer}
-button:disabled{background:#aaa}
-.out{margin-top:16px;padding:12px;border-radius:8px;font-family:monospace;font-size:13px;min-height:48px;white-space:pre-wrap;word-break:break-all;border-left:4px solid #ccc;background:#f5f7fa}
-.ok{border-left-color:#0A6655;color:#0A6655;background:#edfaf6}
-.er{border-left-color:#c0392b;color:#c0392b;background:#fdf0ee}
-.in{border-left-color:#1a6eb5;color:#1a6eb5;background:#eef4fd}
-small{display:block;margin-top:16px;color:#aaa;text-align:center;font-size:11px}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIRA Secure Verification</title>
+
+  <!-- Fonts: DM Sans (EN/FR) + Cairo (AR) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Reset ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── CSS Variables ─────────────────────────────────────── */
+    :root {
+      --green-dark:   #1e6b50;
+      --green-mid:    #2e7d5e;
+      --green-hover:  #185e45;
+      --green-light:  #e8f5ef;
+      --blue-accent:  #4a80c4;
+      --blue-light:   #eef3fb;
+      --navy:         #0f2a4a;
+      --text-mid:     #5a6a7a;
+      --text-light:   #7a8a9a;
+      --text-faint:   #aab4bf;
+      --border:       #ccd5de;
+      --bg-field:     #f4f6f8;
+      --white:        #ffffff;
+      --shadow:       0 20px 60px rgba(15,42,74,0.12);
+      --radius-card:  20px;
+      --radius-btn:   12px;
+      --radius-field: 10px;
+      --font-latin:   'DM Sans', 'Segoe UI', sans-serif;
+      --font-arabic:  'Cairo', 'Segoe UI', sans-serif;
+    }
+
+    /* ── Page ──────────────────────────────────────────────── */
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #f3f6fb 0%, #e2e9f3 50%, #d5dfeb 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-latin);
+      position: relative;
+      overflow: hidden;
+    }
+
+    body.lang-ar {
+      font-family: var(--font-arabic);
+      direction: rtl;
+    }
+
+    /* ── Background code decoration ───────────────────────── */
+    .bg-code {
+      position: absolute;
+      top: 48%;
+      transform: translateY(-50%);
+      font-family: monospace;
+      font-size: 13px;
+      color: #b0b8c4;
+      line-height: 1.7;
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .bg-code.left  { left: 2%; }
+    .bg-code.right { right: 2%; text-align: right; }
+
+    /* ── Language switcher ─────────────────────────────────── */
+    #lang-switcher {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      display: flex;
+      gap: 6px;
+      z-index: 10;
+    }
+
+    .lang-btn {
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 2px solid var(--border);
+      background: var(--white);
+      color: var(--text-mid);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: all 0.15s;
+      font-family: var(--font-latin);
+    }
+    .lang-btn.active {
+      background: var(--green-dark);
+      border-color: var(--green-dark);
+      color: var(--white);
+    }
+
+    /* ── Card ──────────────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border-radius: var(--radius-card);
+      padding: 44px 48px 40px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: var(--shadow);
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Title ─────────────────────────────────────────────── */
+    .card h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 28px;
+      letter-spacing: -0.3px;
+    }
+    body.lang-ar .card h1 { letter-spacing: 0; }
+
+    /* ── Session ID field ──────────────────────────────────── */
+    .field-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .session-id-box {
+      background: var(--bg-field);
+      border-radius: var(--radius-field);
+      padding: 13px 16px;
+      font-family: monospace;
+      font-size: 14px;
+      color: #2d3d4f;
+      letter-spacing: 0.02em;
+      word-break: break-all;
+      margin-bottom: 20px;
+      direction: ltr; /* always LTR for hex ID */
+    }
+    body.lang-ar .session-id-box { text-align: right; }
+
+    /* ── Primary button ────────────────────────────────────── */
+    #verify-btn {
+      width: 100%;
+      padding: 16px;
+      background: var(--green-dark);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius-btn);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: background 0.2s, opacity 0.2s;
+      letter-spacing: 0.01em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+    }
+    body.lang-ar #verify-btn { letter-spacing: 0; }
+    #verify-btn:hover:not(:disabled) { background: var(--green-hover); }
+    #verify-btn:disabled { cursor: default; opacity: 0.75; }
+    #verify-btn.success  { background: var(--green-mid); opacity: 1; cursor: default; }
+
+    /* Spinner inside button */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2.5px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Status box ────────────────────────────────────────── */
+    #status-box {
+      background: var(--blue-light);
+      border-left: 4px solid var(--blue-accent);
+      border-radius: 8px;
+      padding: 14px 16px;
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    body.lang-ar #status-box {
+      border-left: none;
+      border-right: 4px solid var(--blue-accent);
+    }
+    #status-box.success {
+      background: var(--green-light);
+      border-color: var(--green-mid);
+    }
+    body.lang-ar #status-box.success { border-color: var(--green-mid); }
+
+    #status-msg {
+      font-size: 14px;
+      color: var(--blue-accent);
+      font-style: italic;
+      font-family: monospace;
+      transition: color 0.3s;
+    }
+    body.lang-ar #status-msg { font-family: var(--font-arabic); font-style: normal; }
+    #status-box.success #status-msg { color: var(--green-dark); font-style: normal; }
+
+    /* ── Reset button ──────────────────────────────────────── */
+    #reset-btn {
+      display: none;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: var(--text-light);
+      cursor: pointer;
+      margin: -12px auto 16px;
+      font-family: inherit;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #reset-btn:hover { border-color: var(--green-dark); color: var(--green-dark); }
+
+    /* ── Footer ────────────────────────────────────────────── */
+    .footer-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-faint);
+    }
+
+    /* ── Already-verified screen ───────────────────────────── */
+    #already-screen {
+      display: none;
+      text-align: center;
+    }
+    #already-screen .check-icon { font-size: 48px; margin-bottom: 16px; }
+    #already-screen h1 {
+      font-size: 22px; font-weight: 700;
+      color: var(--navy); margin-bottom: 12px;
+    }
+    #already-screen p {
+      font-size: 15px; color: var(--text-mid);
+      line-height: 1.7; margin-bottom: 24px;
+    }
+    #already-screen .status-tag {
+      background: var(--green-light);
+      border-left: 4px solid var(--green-mid);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--green-dark);
+      font-family: monospace;
+      text-align: left;
+      margin-bottom: 20px;
+    }
+    body.lang-ar #already-screen .status-tag {
+      border-left: none;
+      border-right: 4px solid var(--green-mid);
+      text-align: right;
+    }
+  </style>
 </head>
 <body>
-<div class="card">
-  <h2>SIRA Secure Verification</h2>
-  <div style="font-size:13px;color:#666;font-weight:600;text-transform:uppercase">Session ID</div>
-  <div class="box" id="S">loading...</div>
-  <button id="B">Start credential verification</button>
-  <div class="out in" id="O">Waiting...</div>
-  <small>SIRA stores no personal data. Passkeys only.</small>
-</div>
+
+  <!-- Background code decoration -->
+  <div class="bg-code left">
+    <div>Deno.serve((_req: Request) => {</div>
+    <div>&nbsp;&nbsp;const html = \`</div>
+  </div>
+  <div class="bg-code right">
+    <div>\`; return new Response(html,{ headers:{ "Content-</div>
+    <div>Type":"text/html; charset=utf-8" } }); });</div>
+  </div>
+
+  <!-- Language switcher -->
+  <div id="lang-switcher">
+    <button class="lang-btn active" onclick="setLang('en')">EN</button>
+    <button class="lang-btn"        onclick="setLang('fr')">FR</button>
+    <button class="lang-btn"        onclick="setLang('ar')">AR</button>
+  </div>
+
+  <!-- Card -->
+  <div class="card" id="main-card">
+
+    <!-- Already-verified screen (hidden by default) -->
+    <div id="already-screen">
+      <div class="check-icon">✅</div>
+      <h1 id="already-title"></h1>
+      <p  id="already-body"></p>
+      <div class="status-tag" id="already-tag"></div>
+      <p class="footer-note" id="already-footer"></p>
+    </div>
+
+    <!-- Main verification UI -->
+    <div id="verify-screen">
+      <h1 id="ui-title"></h1>
+
+      <label class="field-label" id="ui-session-label"></label>
+      <div class="session-id-box" id="session-id-display">—</div>
+
+      <button id="verify-btn" onclick="startVerification()">
+        <span id="btn-label"></span>
+      </button>
+
+      <div id="status-box">
+        <span id="status-msg"></span>
+      </div>
+
+      <button id="reset-btn" onclick="resetFlow()"></button>
+
+      <p class="footer-note" id="ui-footer"></p>
+    </div>
+
+  </div><!-- /card -->
+
 
 <script>
-(function(){
-  var BASE = "https://ubookoijqdmrxdlxldxf.supabase.co/functions/v1";
-  var p = new URLSearchParams(location.search);
-  var sid = p.get("sid") || "";
-  var sig = p.get("sig") || "";
-  var S = document.getElementById("S");
-  var O = document.getElementById("O");
-  var B = document.getElementById("B");
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. CONFIGURATION
+//    Replace these two values with your real Supabase project URL.
+// ─────────────────────────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://ubookoijqdmrxdlxldxf.supabase.co";
+const CREATE_CHALLENGE_URL = \`\${SUPABASE_URL}/functions/v1/create-challenge\`;
+const VERIFY_ASSERTION_URL = \`\${SUPABASE_URL}/functions/v1/verify-assertion\`;
 
-  S.textContent = sid || "(missing session)";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. TRANSLATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+const LANGS = {
+  en: {
+    dir: "ltr",
+    title:          "SIRA Secure Verification",
+    sessionLabel:   "Session ID",
+    btnWaiting:     "Start credential verification",
+    btnLoading:     "Verifying…",
+    btnSuccess:     "✓ Verified",
+    msgWaiting:     "Waiting…",
+    msgStarting:    "Starting verification…",
+    msgChecking:    "Checking credentials…",
+    msgDone:        "✓ Verification complete.",
+    msgError:       "Verification failed. Please try again.",
+    reset:          "Reset",
+    footer:         "SIRA stores no personal data. Passkeys only.",
+    alreadyTitle:   "Session already verified",
+    alreadyBody:    "This verification session has already been completed successfully. You can safely close this page.",
+    alreadyTag:     "status: verified · session consumed",
+  },
+  fr: {
+    dir: "ltr",
+    title:          "Vérification sécurisée SIRA",
+    sessionLabel:   "ID de session",
+    btnWaiting:     "Lancer la vérification",
+    btnLoading:     "Vérification…",
+    btnSuccess:     "✓ Vérifié",
+    msgWaiting:     "En attente…",
+    msgStarting:    "Démarrage de la vérification…",
+    msgChecking:    "Vérification des identifiants…",
+    msgDone:        "✓ Vérification terminée.",
+    msgError:       "Échec de la vérification. Veuillez réessayer.",
+    reset:          "Réinitialiser",
+    footer:         "SIRA ne stocke aucune donnée personnelle. Clés d'accès uniquement.",
+    alreadyTitle:   "Session déjà vérifiée",
+    alreadyBody:    "Cette session de vérification a déjà été complétée avec succès. Vous pouvez fermer cette page en toute sécurité.",
+    alreadyTag:     "statut : vérifié · session consommée",
+  },
+  ar: {
+    dir: "rtl",
+    title:          "التحقق الآمن من SIRA",
+    sessionLabel:   "معرّف الجلسة",
+    btnWaiting:     "بدء التحقق من الهوية",
+    btnLoading:     "جارٍ التحقق…",
+    btnSuccess:     "✓ تم التحقق",
+    msgWaiting:     "في انتظار…",
+    msgStarting:    "جارٍ بدء التحقق…",
+    msgChecking:    "جارٍ التحقق من البيانات…",
+    msgDone:        "✓ اكتمل التحقق.",
+    msgError:       "فشل التحقق. يرجى المحاولة مجدداً.",
+    reset:          "إعادة تعيين",
+    footer:         "لا تخزّن SIRA أي بيانات شخصية. مفاتيح المرور فقط.",
+    alreadyTitle:   "تم التحقق من الجلسة مسبقاً",
+    alreadyBody:    "تمت هذه الجلسة بنجاح. يمكنك إغلاق هذه الصفحة بأمان.",
+    alreadyTag:     "الحالة: تم التحقق · الجلسة مستهلكة",
+  },
+};
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let currentLang = "en";
+let verifyState = "waiting"; // waiting | loading | success | error
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. LANGUAGE SWITCHER
+// ─────────────────────────────────────────────────────────────────────────────
+function setLang(lang) {
+  currentLang = lang;
+  const t = LANGS[lang];
+
+  // Direction + font
+  document.documentElement.lang = lang;
+  document.body.dir = t.dir;
+  document.body.classList.toggle("lang-ar", lang === "ar");
+
+  // Update all text nodes
+  document.getElementById("ui-title").textContent          = t.title;
+  document.getElementById("ui-session-label").textContent  = t.sessionLabel;
+  document.getElementById("ui-footer").textContent         = t.footer;
+  document.getElementById("reset-btn").textContent         = t.reset;
+  document.getElementById("already-title").textContent     = t.alreadyTitle;
+  document.getElementById("already-body").textContent      = t.alreadyBody;
+  document.getElementById("already-tag").textContent       = t.alreadyTag;
+  document.getElementById("already-footer").textContent    = t.footer;
+
+  // Re-sync button and status to current state
+  syncStateUI();
+
+  // Active pill
+  document.querySelectorAll(".lang-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.textContent === lang.toUpperCase());
+  });
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. STATE → UI SYNC
+// ─────────────────────────────────────────────────────────────────────────────
+function syncStateUI() {
+  const t   = LANGS[currentLang];
+  const btn = document.getElementById("verify-btn");
+  const box = document.getElementById("status-box");
+  const msg = document.getElementById("status-msg");
+  const lbl = document.getElementById("btn-label");
+
+  // Clear spinner
+  btn.querySelectorAll(".spinner").forEach(s => s.remove());
+
+  if (verifyState === "waiting") {
+    btn.disabled = false;
+    btn.classList.remove("success");
+    lbl.textContent = t.btnWaiting;
+    box.classList.remove("success");
+    msg.textContent = t.msgWaiting;
+    document.getElementById("reset-btn").style.display = "none";
+
+  } else if (verifyState === "loading") {
+    btn.disabled = true;
+    btn.classList.remove("success");
+    const spinner = document.createElement("div");
+    spinner.className = "spinner";
+    btn.insertBefore(spinner, lbl);
+    lbl.textContent = t.btnLoading;
+    box.classList.remove("success");
+    msg.textContent = t.msgStarting;
+
+  } else if (verifyState === "success") {
+    btn.disabled = true;
+    btn.classList.add("success");
+    lbl.textContent = t.btnSuccess;
+    box.classList.add("success");
+    msg.textContent = t.msgDone;
+    document.getElementById("reset-btn").style.display = "block";
+
+  } else if (verifyState === "error") {
+    btn.disabled = false;
+    btn.classList.remove("success");
+    lbl.textContent = t.btnWaiting;
+    box.classList.remove("success");
+    msg.textContent = t.msgError;
+    document.getElementById("reset-btn").style.display = "none";
+  }
+}
+
+function setStatus(state, customMsg) {
+  verifyState = state;
+  syncStateUI();
+  if (customMsg) {
+    document.getElementById("status-msg").textContent = customMsg;
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. ALREADY-VERIFIED SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
+function showAlreadyVerified() {
+  document.getElementById("verify-screen").style.display  = "none";
+  document.getElementById("already-screen").style.display = "block";
+  // Translate the already-verified screen
+  const t = LANGS[currentLang];
+  document.getElementById("already-title").textContent  = t.alreadyTitle;
+  document.getElementById("already-body").textContent   = t.alreadyBody;
+  document.getElementById("already-tag").textContent    = t.alreadyTag;
+  document.getElementById("already-footer").textContent = t.footer;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. RESET
+// ─────────────────────────────────────────────────────────────────────────────
+function resetFlow() {
+  verifyState = "waiting";
+  syncStateUI();
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. MAIN VERIFICATION FLOW  (real WebAuthn + Supabase)
+// ─────────────────────────────────────────────────────────────────────────────
+async function startVerification() {
+  const t = LANGS[currentLang];
+
+  // Read sid + sig from URL
+  const params = new URLSearchParams(window.location.search);
+  const sid    = params.get("sid");
+  const sig    = params.get("sig");
 
   if (!sid || !sig) {
-    O.textContent = "Missing sid or sig in URL";
-    O.className = "out er";
-    B.disabled = true;
+    setStatus("error", "Missing session parameters (sid / sig).");
+    return;
   }
 
-  function setOut(m, t) {
-    O.textContent = typeof m === "string" ? m : JSON.stringify(m, null, 2);
-    O.className = "out " + (t || "in");
-  }
+  try {
+    // ── Step 1: create-challenge ──────────────────────────
+    setStatus("loading");
+    document.getElementById("status-msg").textContent = t.msgStarting;
 
-  function dec(s) {
-    var b = s.replace(/-/g, "+").replace(/_/g, "/");
-    var pad = "=".repeat((4 - b.length % 4) % 4);
-    var bin = atob(b + pad);
-    return Uint8Array.from(bin, function(c){ return c.charCodeAt(0); });
-  }
+    const challengeRes = await fetch(CREATE_CHALLENGE_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ sid, sig }),
+    });
 
-  B.addEventListener("click", async function(){
-    B.disabled = true;
-    setOut("Getting challenge...", "in");
+    const challengeData = await challengeRes.json();
 
-    try {
-      var r1 = await fetch(
-        BASE + "/create-challenge?sid=" + encodeURIComponent(sid) + "&sig=" + encodeURIComponent(sig),
-        { method: "GET", headers: { "accept": "application/json" }, cache: "no-store" }
-      );
-      var j1 = await r1.json();
-      if (!r1.ok) throw new Error("create-challenge: " + JSON.stringify(j1));
-      if (!j1.challenge) throw new Error("No challenge in response");
-
-      setOut("Challenge OK. Touch your device...", "in");
-
-      var pk = {
-        challenge: dec(j1.challenge),
-        rpId: j1.rpId,
-        timeout: j1.timeoutMs || 90000,
-        userVerification: j1.userVerification || "required",
-        allowCredentials: []
-      };
-
-      var c = await navigator.credentials.get({ publicKey: pk });
-      if (!c) throw new Error("No credential returned");
-
-      setOut("Signed. Verifying...", "in");
-
-      var a = {
-        id: c.id,
-        type: c.type,
-        rawId: Array.from(new Uint8Array(c.rawId)),
-        response: {
-          clientDataJSON: Array.from(new Uint8Array(c.response.clientDataJSON)),
-          authenticatorData: Array.from(new Uint8Array(c.response.authenticatorData)),
-          signature: Array.from(new Uint8Array(c.response.signature))
-        }
-      };
-
-      var r2 = await fetch(BASE + "/verify-assertion", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sid: sid, sig: sig, assertion: a }),
-        cache: "no-store"
-      });
-
-      var j2 = await r2.json();
-      if (!r2.ok) throw new Error("verify-assertion: " + JSON.stringify(j2));
-
-      setOut("ACCESS GRANTED\\n" + JSON.stringify(j2, null, 2), "ok");
-
-    } catch(e) {
-      setOut("ERROR: " + (e.message || String(e)), "er");
-    } finally {
-      B.disabled = false;
+    // Session already consumed → show friendly screen
+    if (!challengeData.ok && challengeData.error === "session-not-usable") {
+      showAlreadyVerified();
+      return;
     }
-  });
+
+    if (!challengeData.ok) {
+      throw new Error(challengeData.error || "create-challenge failed");
+    }
+
+    // ── Step 2: WebAuthn get (passkey prompt) ─────────────
+    document.getElementById("status-msg").textContent = t.msgChecking;
+
+    const assertionOptions = challengeData.options; // PublicKeyCredentialRequestOptions
+    // Base64url → ArrayBuffer for required fields
+    assertionOptions.challenge = base64urlToBuffer(assertionOptions.challenge);
+    if (assertionOptions.allowCredentials) {
+      assertionOptions.allowCredentials = assertionOptions.allowCredentials.map(c => ({
+        ...c,
+        id: base64urlToBuffer(c.id),
+      }));
+    }
+
+    const assertion = await navigator.credentials.get({ publicKey: assertionOptions });
+
+    // ── Step 3: verify-assertion ──────────────────────────
+    const assertionPayload = {
+      sid,
+      sig,
+      id:       assertion.id,
+      rawId:    bufferToBase64url(assertion.rawId),
+      type:     assertion.type,
+      response: {
+        authenticatorData: bufferToBase64url(assertion.response.authenticatorData),
+        clientDataJSON:    bufferToBase64url(assertion.response.clientDataJSON),
+        signature:         bufferToBase64url(assertion.response.signature),
+        userHandle:        assertion.response.userHandle
+                             ? bufferToBase64url(assertion.response.userHandle)
+                             : null,
+      },
+    };
+
+    const verifyRes  = await fetch(VERIFY_ASSERTION_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(assertionPayload),
+    });
+
+    const verifyData = await verifyRes.json();
+
+    if (!verifyData.ok) {
+      throw new Error(verifyData.error || "verify-assertion failed");
+    }
+
+    // ── Success ───────────────────────────────────────────
+    setStatus("success");
+
+  } catch (err) {
+    console.error("SIRA verification error:", err);
+
+    // User cancelled the passkey prompt — treat as soft error
+    if (err.name === "NotAllowedError") {
+      setStatus("error", currentLang === "ar"
+        ? "تم إلغاء التحقق."
+        : currentLang === "fr"
+          ? "Vérification annulée."
+          : "Verification cancelled.");
+      return;
+    }
+
+    setStatus("error", err.message || t.msgError);
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. BASE64URL HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function base64urlToBuffer(base64url) {
+  const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(base64);
+  const buffer = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
+  return buffer.buffer;
+}
+
+function bufferToBase64url(buffer) {
+  const bytes  = new Uint8Array(buffer);
+  let   binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=/g, "");
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. BOOT — read sid from URL, render initial UI in English
+// ─────────────────────────────────────────────────────────────────────────────
+(function boot() {
+  const params = new URLSearchParams(window.location.search);
+  const sid    = params.get("sid") || "—";
+  document.getElementById("session-id-display").textContent = sid;
+  setLang("en"); // renders all strings
 })();
 </script>
 </body>
-</html>`;
+</html>
 
+`;
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
