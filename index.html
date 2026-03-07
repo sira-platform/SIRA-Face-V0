@@ -1,6 +1,5 @@
-Deno.serve((_req: Request) => {
-  const html = `<!DOCTYPE html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -45,7 +44,6 @@ document.getElementById("sid").textContent =
 async function startVerification() {
   const sid = params.get("sid")
   const sig = params.get("sig")
-  const base = window.location.origin
   const out = document.getElementById("out")
   const btn = document.getElementById("go")
 
@@ -59,8 +57,7 @@ async function startVerification() {
 
   try {
     const r = await fetch(
-      base +
-      "/functions/v1/create-challenge?sid=" +
+      "https://ubookoijqdmrxdlxldxf.supabase.co/functions/v1/create-challenge?sid=" +
       encodeURIComponent(sid) +
       "&sig=" +
       encodeURIComponent(sig)
@@ -104,7 +101,7 @@ async function startVerification() {
     out.textContent = "Credential signed. Verifying with SIRA..."
 
     const verify = await fetch(
-      base + "/functions/v1/verify-assertion",
+      "https://ubookoijqdmrxdlxldxf.supabase.co/functions/v1/verify-assertion",
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -124,17 +121,4 @@ async function startVerification() {
 document.getElementById("go").addEventListener("click", () => startVerification())
 </script>
 </body>
-</html>`
-
-  return new Response(html, {
-    status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-store",
-      "Content-Security-Policy":
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
-      "Permissions-Policy":
-        "publickey-credentials-get=*, publickey-credentials-create=*"
-    }
-  })
-})
+</html>
