@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SIRA Device Authentication</title>
+</head>
+
+<body>
+
+<h2>SIRA Device Authentication</h2>
+
+<button onclick="authenticate()">Authenticate Device</button>
+
+<script>
+
+async function authenticate() {
+
+  const base = "https://ubookoijqdmrxdlxldxf.supabase.co/functions/v1"
+
+  const credentialId = prompt("Enter credential ID")
+
+  const challengeResponse = await fetch(base + "/create-authentication-challenge",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      credential_id: credentialId
+    })
+  })
+
+  const challengeData = await challengeResponse.json()
+
+  const publicKey = {
+    challenge: Uint8Array.from(challengeData.challenge, c => c.charCodeAt(0)),
+    allowCredentials: [{
+      id: Uint8Array.from(credentialId, c => c.charCodeAt(0)),
+      type: "public-key"
+    }]
+  }
+
+  const assertion = await navigator.credentials.get({ publicKey })
+
+  const verify = await fetch(base + "/verify-authentication",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(assertion)
+  })
+
+  const result = await verify.json()
+
+  alert("Authentication success")
+
+}
+
+</script>
+
+</body>
+</html>
