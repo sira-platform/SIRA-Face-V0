@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SIRA Device Registration</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --card: #121a2b;
+      --text: #e8eefc;
+      --muted: #9fb0d3;
+      --accent: #6ea8fe;
+      --ok: #26c281;
+      --warn: #ffb020;
+      --err: #ff6b6b;
+      --border: #24314f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, Arial, sans-serif;
+      background: linear-gradient(180deg, #0b1220, #0f1830);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 720px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+    p {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .row {
+      margin-top: 18px;
+    }
+    label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    input, button, textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #0d1526;
+      color: var(--text);
+      padding: 14px 16px;
+      font-size: 15px;
+    }
+    input:focus, button:focus, textarea:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    button {
+      cursor: pointer;
+      background: linear-gradient(180deg, #2b69ff, #1e53d9);
+      border: none;
+      font-weight: 700;
+      margin-top: 18px;
+    }
+    button[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #0d1526;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 56px;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .err { color: var(--err); }
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>SIRA Device Registration</h1>
+    <p>
+      This page requests a SIRA registration challenge, runs WebAuthn passkey creation in the browser,
+      then sends the attestation result to <span class="mono">register-device-proxy</span>.
+    </p>
+
+    <div class="row">
+      <label for="inviteToken">Invite token</label>
+      <input id="inviteToken" type="text" placeholder="Paste onboarding invite token" />
+      <div class="small">You can also open this page with <span class="mono">?token=YOUR_INVITE_TOKEN</span></div>
+    </div>
+
+    <div class="row">
+      <label for="baseUrl">Supabase functions base URL</label>
+      <input id="baseUrl" type="text" value="https://ubookoijqdmrxdlxldxf.supabase.co/functions/v1" />
+    </div>
+
+    <button id="registerBtn" type="button">Register this device</button>
+
+    <div id="status" class="status">Ready.</div>
+
+    <div class="small">
+      Host this page on an origin that matches your current allowlist and RP ID.
+      Your current setup appears to expect <span class="mono">https://sira-platform.github.io</span>.
+    </div>
+  </div>
+
+  <script>
+    const inviteInput = document.getElementById("inviteToken");
+    const baseUrlInput = document.getElementById("baseUrl");
+    const registerBtn = document.getElementById("registerBtn");
+    const statusBox = document.getElementById("status");
+
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get("token");
+    if (tokenFromUrl) inviteInput.value = tokenFromUrl;
+
+    function setStatus(message, kind = "") {
+      statusBox.className = "status";
+      if (kind) statusBox.classList.add(kind);
+      statusBox.textContent = message;
+    }
+
+    function base64UrlToUint8Array(base64url) {
+      const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+      const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+      const raw = atob(base64 + padding);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      return bytes;
+    }
+
+    function uint8ArrayToBase64Url(bytes) {
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    }
+
+    function arrayBufferToBase64Url(buffer) {
+      return uint8ArrayToBase64Url(new Uint8Array(buffer));
+    }
+
+    function decodeJwtPayload(token) {
+      try {
+        const payload = token.split(".")[1];
+        if (!payload) return null;
+        const json = new TextDecoder().decode(base64UrlToUint8Array(payload));
+        return JSON.parse(json);
+      } catch {
+        return null;
+      }
+    }
+
+    function inferUserHandle(inviteToken) {
+      const payload = decodeJwtPayload(inviteToken);
+      const candidate = payload?.sub || payload?.jti || inviteToken;
+      const bytes = new TextEncoder().encode(String(candidate));
+      return bytes.slice(0, 64);
+    }
+
+    function inferUserName(inviteToken) {
+      const payload = decodeJwtPayload(inviteToken);
+      return String(payload?.sub || payload?.jti || inviteToken);
+    }
+
+    function inferDisplayName(inviteToken) {
+      const payload = decodeJwtPayload(inviteToken);
+      return String(payload?.sub || payload?.jti || "SIRA User");
+    }
+
+    async function fetchJson(url, options) {
+      const res = await fetch(url, options);
+      let body = null;
+      try {
+        body = await res.json();
+      } catch {
+        body = null;
+      }
+      return { res, body };
+    }
+
+    async function getRegistrationChallenge(baseUrl, inviteToken) {
+      const url = `${baseUrl}/create-challenge?action=register-challenge&token=${encodeURIComponent(inviteToken)}`;
+      const { res, body } = await fetchJson(url, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json"
+        }
+      });
+
+      if (!res.ok || !body?.ok) {
+        const message = body?.message || body?.error || `Challenge request failed with ${res.status}`;
+        throw new Error(message);
+      }
+      return body;
+    }
+
+    function buildPublicKeyOptions(challengeResponse, inviteToken) {
+      return {
+        challenge: base64UrlToUint8Array(challengeResponse.challenge),
+        rp: {
+          id: challengeResponse.rpId,
+          name: "SIRA"
+        },
+        user: {
+          id: inferUserHandle(inviteToken),
+          name: inferUserName(inviteToken),
+          displayName: inferDisplayName(inviteToken)
+        },
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },
+          { type: "public-key", alg: -257 }
+        ],
+        authenticatorSelection: {
+          userVerification: challengeResponse.userVerification || "required",
+          residentKey: "preferred"
+        },
+        timeout: challengeResponse.timeoutMs || 60000,
+        attestation: "direct"
+      };
+    }
+
+    async function createPasskey(publicKey) {
+      const credential = await navigator.credentials.create({ publicKey });
+      if (!credential) throw new Error("Passkey creation returned no credential");
+
+      const response = credential.response;
+      if (!(response instanceof AuthenticatorAttestationResponse)) {
+        throw new Error("Unexpected attestation response type");
+      }
+
+      return {
+        credential_id: credential.id,
+        raw_id: arrayBufferToBase64Url(credential.rawId),
+        client_data_json: arrayBufferToBase64Url(response.clientDataJSON),
+        attestation_object: arrayBufferToBase64Url(response.attestationObject)
+      };
+    }
+
+    async function sendToProxy(baseUrl, inviteToken, payload) {
+      const url = `${baseUrl}/register-device-proxy`;
+      const { res, body } = await fetchJson(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          invite_token: inviteToken,
+          credential_id: payload.credential_id,
+          raw_id: payload.raw_id,
+          client_data_json: payload.client_data_json,
+          attestation_object: payload.attestation_object
+        })
+      });
+
+      if (!res.ok || !body?.ok) {
+        const message = body?.message || body?.error || `Proxy request failed with ${res.status}`;
+        throw new Error(message);
+      }
+      return body;
+    }
+
+    registerBtn.addEventListener("click", async () => {
+      const inviteToken = inviteInput.value.trim();
+      const baseUrl = baseUrlInput.value.trim().replace(/\/$/, "");
+
+      if (!inviteToken) {
+        setStatus("Please paste an invite token first.", "warn");
+        return;
+      }
+
+      if (!window.PublicKeyCredential) {
+        setStatus("This browser does not support WebAuthn passkeys.", "err");
+        return;
+      }
+
+      registerBtn.disabled = true;
+
+      try {
+        setStatus("Requesting registration challenge...", "warn");
+        const challengeResponse = await getRegistrationChallenge(baseUrl, inviteToken);
+
+        setStatus("Creating passkey on this device...", "warn");
+        const publicKey = buildPublicKeyOptions(challengeResponse, inviteToken);
+        const attestationPayload = await createPasskey(publicKey);
+
+        setStatus("Sending attestation to register-device-proxy...", "warn");
+        const proxyResponse = await sendToProxy(baseUrl, inviteToken, attestationPayload);
+
+        setStatus(
+          `Registration successful.\n\nCredential ID:\n${proxyResponse.credential_id}\n\nRP ID:\n${proxyResponse.rp_id}\n\nOrigin:\n${proxyResponse.origin}`,
+          "ok"
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setStatus(`Registration failed.\n\n${message}`, "err");
+      } finally {
+        registerBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
