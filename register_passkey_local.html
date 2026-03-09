@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SIRA Passkey Registration</title>
+  <style>
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      margin: 0;
+      background: #f6f7f9;
+      color: #10243e;
+    }
+    .wrap {
+      max-width: 760px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 28px;
+    }
+    .muted {
+      color: #5b6b7d;
+      margin-bottom: 18px;
+    }
+    .row {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #cfd6df;
+      font-size: 15px;
+    }
+    button {
+      background: #10243e;
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 18px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #eef3f8;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .ok {
+      background: #e8f7ee;
+      color: #125c2f;
+    }
+    .err {
+      background: #fdecec;
+      color: #8b1e1e;
+    }
+    .tag {
+      display: inline-block;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #eef3f8;
+      color: #28405a;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="tag">localhost WebAuthn registration keyless v1</div>
+      <h1>SIRA Passkey Registration</h1>
+      <div class="muted">
+        This page registers a real browser passkey and stores it in SIRA via register-device-proxy.
+      </div>
+
+      <div class="row">
+        <label for="subjectId">Subject ID</label>
+        <input id="subjectId" value="8e8f9869-4f93-4800-a7ba-6f0bd638c2d0" />
+      </div>
+
+      <div class="row">
+        <label for="nickname">Passkey nickname</label>
+        <input id="nickname" value="My real localhost passkey" />
+      </div>
+
+      <button id="registerBtn">Register Passkey</button>
+
+      <div id="status" class="status">Ready.</div>
+    </div>
+  </div>
+
+  <script>
+    const functionBase = "https://ubookoijqdmrxdlxldxf.supabase.co/functions/v1";
+
+    const subjectInput = document.getElementById("subjectId");
+    const nicknameInput = document.getElementById("nickname");
+    const registerBtn = document.getElementById("registerBtn");
+    const statusBox = document.getElementById("status");
+
+    function setStatus(text, kind) {
+      statusBox.textContent = text;
+      statusBox.className = "status" + (kind ? " " + kind : "");
+    }
+
+    function jsonHeaders() {
+      return {
+        "Content-Type": "application/json"
+      };
+    }
+
+    function base64urlToUint8Array(base64url) {
+      const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = "=".repeat((4 - (base64.length % 4)) % 4);
+      const binary = atob(base64 + pad);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function arrayBufferToBase64url(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (const b of bytes) binary += String.fromCharCode(b);
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+
+    function toCreationOptionsFromServer(serverPublicKey) {
+      return {
+        ...serverPublicKey,
+        challenge: base64urlToUint8Array(serverPublicKey.challenge),
+        user: {
+          ...serverPublicKey.user,
+          id: base64urlToUint8Array(serverPublicKey.user.id),
+        },
+        excludeCredentials: (serverPublicKey.excludeCredentials || []).map((c) => ({
+          ...c,
+          id: base64urlToUint8Array(c.id),
+        })),
+      };
+    }
+
+    function credentialToJSON(cred) {
+      const response = cred.response;
+      return {
+        id: cred.id,
+        rawId: arrayBufferToBase64url(cred.rawId),
+        type: cred.type,
+        authenticatorAttachment: cred.authenticatorAttachment || null,
+        transports: typeof response.getTransports === "function" ? response.getTransports() : [],
+        response: {
+          clientDataJSON: arrayBufferToBase64url(response.clientDataJSON),
+          attestationObject: arrayBufferToBase64url(response.attestationObject),
+        }
+      };
+    }
+
+    async function startRegistration(subjectId, nickname) {
+      const res = await fetch(functionBase + "/register-device-proxy", {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify({
+          mode: "start",
+          subject_id: subjectId,
+          nickname
+        })
+      });
+      return await res.json();
+    }
+
+    async function finishRegistration(subjectId, challenge, nickname, credential) {
+      const res = await fetch(functionBase + "/register-device-proxy", {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify({
+          mode: "finish",
+          subject_id: subjectId,
+          challenge,
+          nickname,
+          credential
+        })
+      });
+      return await res.json();
+    }
+
+    registerBtn.addEventListener("click", async () => {
+      const subjectId = subjectInput.value.trim();
+      const nickname = nicknameInput.value.trim() || "My real localhost passkey";
+
+      if (!window.PublicKeyCredential) {
+        setStatus("This browser does not support WebAuthn passkeys.", "err");
+        return;
+      }
+
+      registerBtn.disabled = true;
+      setStatus("Creating SIRA registration challenge...");
+
+      try {
+        const start = await startRegistration(subjectId, nickname);
+
+        if (!start.ok) {
+          setStatus("Start failed:\n" + JSON.stringify(start, null, 2), "err");
+          registerBtn.disabled = false;
+          return;
+        }
+
+        const challenge = start.publicKey.challenge;
+        const options = toCreationOptionsFromServer(start.publicKey);
+
+        setStatus("Triggering browser passkey prompt...");
+
+        const credential = await navigator.credentials.create({
+          publicKey: options
+        });
+
+        if (!credential) {
+          setStatus("No credential was created.", "err");
+          registerBtn.disabled = false;
+          return;
+        }
+
+        const credentialJSON = credentialToJSON(credential);
+
+        setStatus("Finishing registration in SIRA...");
+
+        const finish = await finishRegistration(
+          subjectId,
+          challenge,
+          nickname,
+          credentialJSON
+        );
+
+        if (!finish.ok) {
+          setStatus("Finish failed:\n" + JSON.stringify(finish, null, 2), "err");
+          registerBtn.disabled = false;
+          return;
+        }
+
+        setStatus(
+          "Success. Real passkey stored in SIRA.\n\n" +
+          "Credential ID: " + finish.credential_id + "\n" +
+          "Build: " + finish.build,
+          "ok"
+        );
+      } catch (err) {
+        setStatus("Unexpected error:\n" + (err && err.message ? err.message : String(err)), "err");
+      } finally {
+        registerBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
